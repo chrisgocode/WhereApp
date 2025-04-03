@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "514230416075",
+    "project_id": "whereapp-6c2ec",
+    "storage_bucket": "whereapp-6c2ec.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:514230416075:android:c317d1ba904310340ce14e",
+        "android_client_info": {
+          "package_name": "com.example.where"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "514230416075-546hbfkk256s04ufroln39o2jj82jbba.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJn68WBPUAHCeshkYjy9f3z2f26srtIPU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "514230416075-546hbfkk256s04ufroln39o2jj82jbba.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
