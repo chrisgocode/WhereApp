@@ -12,7 +12,10 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.LatLng
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.math.roundToInt
 
 class RestaurantController(private val context: Context) {
@@ -61,45 +64,68 @@ class RestaurantController(private val context: Context) {
     suspend fun getUserLocation(onSuccess: (LatLng) -> Unit, onError: (String) -> Unit) {
         Log.d("RestaurantController", "Getting user location...")
         try {
-            withContext(Dispatchers.IO) {
-                fusedLocationClient.lastLocation
-                    .addOnSuccessListener { location: Location? ->
-                        if (location != null) {
-                            val latLng = LatLng(location.latitude, location.longitude)
-                            Log.d("RestaurantController", "Location found: $latLng")
-                            _userLocation.value = latLng
-                            onSuccess(latLng)
-                        } else {
-                            // For emulator testing - if no location available, use a default location
-                            Log.d(
-                                "RestaurantController",
-                                "No location available, using default for emulator testing"
-                            )
-                            // San Francisco coordinates
-                            val defaultLatLng = LatLng(37.7749, -122.4194)
-                            _userLocation.value = defaultLatLng
-                            onSuccess(defaultLatLng)
-                        }
-                    }
-                    .addOnFailureListener {
-                        Log.e("RestaurantController", "Location failure: ${it.message}")
-
-                        // For emulator testing - use a default location on failure
-                        Log.d(
-                            "RestaurantController",
-                            "Location failure, using default for emulator testing"
-                        )
-                        val defaultLatLng = LatLng(37.7749, -122.4194)
-                        _userLocation.value = defaultLatLng
-                        onSuccess(defaultLatLng)
-                    }
-            }
+            val location = getLocationSuspend()
+            _userLocation.value = location
+            onSuccess(location)
         } catch (e: SecurityException) {
             Log.e("RestaurantController", "Security exception: ${e.message}")
             onError("Location permission not granted")
         } catch (e: Exception) {
             Log.e("RestaurantController", "Error getting location: ${e.message}")
-            onError("Error getting location: ${e.message}")
+            
+            // For emulator testing - use a default location on failure
+            Log.d(
+                "RestaurantController",
+                "Error occurred, using default location for emulator testing"
+            )
+            val defaultLatLng = LatLng(37.7749, -122.4194)
+            _userLocation.value = defaultLatLng
+            onSuccess(defaultLatLng)
+        }
+    }
+
+    // Properly suspending function to get location
+    private suspend fun getLocationSuspend(): LatLng = suspendCancellableCoroutine { continuation ->
+        try {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location: Location? ->
+                    if (location != null) {
+                        val latLng = LatLng(location.latitude, location.longitude)
+                        Log.d("RestaurantController", "Location found: $latLng")
+                        continuation.resume(latLng)
+                    } else {
+                        // For emulator testing - if no location available, use a default location
+                        Log.d(
+                            "RestaurantController",
+                            "No location available, using default for emulator testing"
+                        )
+                        // San Francisco coordinates
+                        val defaultLatLng = LatLng(37.7749, -122.4194)
+                        continuation.resume(defaultLatLng)
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    Log.e("RestaurantController", "Location failure: ${exception.message}")
+                    
+                    // For emulator testing - use a default location on failure
+                    Log.d(
+                        "RestaurantController",
+                        "Location failure, using default for emulator testing"
+                    )
+                    val defaultLatLng = LatLng(37.7749, -122.4194)
+                    continuation.resume(defaultLatLng)
+                    
+                    // In a production app, you might want to propagate the error instead:
+                    // continuation.resumeWithException(exception)
+                }
+
+            // Register cancellation handler
+            continuation.invokeOnCancellation {
+                // Clean up resources if needed
+                Log.d("RestaurantController", "Location request cancelled")
+            }
+        } catch (e: Exception) {
+            continuation.resumeWithException(e)
         }
     }
 
