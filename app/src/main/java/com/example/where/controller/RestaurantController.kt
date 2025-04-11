@@ -1,9 +1,11 @@
 package com.example.where.controller
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.location.Location
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.content.ContextCompat
 import com.example.where.model.NearbySearchResponse
 import com.example.where.model.Restaurant
 import com.example.where.model.RestaurantApiClient
@@ -17,6 +19,7 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.roundToInt
+import android.Manifest
 
 class RestaurantController(private val context: Context) {
 
@@ -60,16 +63,41 @@ class RestaurantController(private val context: Context) {
         apiKey = key
     }
 
+    // Check if we have location permissions
+    private fun hasLocationPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context, 
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
     // Get user's current location
     suspend fun getUserLocation(onSuccess: (LatLng) -> Unit, onError: (String) -> Unit) {
         Log.d("RestaurantController", "Getting user location...")
         try {
+            if (!hasLocationPermission()) {
+                throw SecurityException("Location permission not granted")
+            }
+            
             val location = getLocationSuspend()
             _userLocation.value = location
             onSuccess(location)
         } catch (e: SecurityException) {
             Log.e("RestaurantController", "Security exception: ${e.message}")
             onError("Location permission not granted")
+            
+            // For emulator testing - use a default location on permission error
+            Log.d(
+                "RestaurantController",
+                "Permission not granted, using default location for emulator testing"
+            )
+            val defaultLatLng = LatLng(37.7749, -122.4194)
+            _userLocation.value = defaultLatLng
+            onSuccess(defaultLatLng)
         } catch (e: Exception) {
             Log.e("RestaurantController", "Error getting location: ${e.message}")
             
@@ -87,6 +115,12 @@ class RestaurantController(private val context: Context) {
     // Properly suspending function to get location
     private suspend fun getLocationSuspend(): LatLng = suspendCancellableCoroutine { continuation ->
         try {
+            // Double-check permission before accessing location
+            if (!hasLocationPermission()) {
+                continuation.resumeWithException(SecurityException("Location permission not granted"))
+                return@suspendCancellableCoroutine
+            }
+            
             fusedLocationClient.lastLocation
                 .addOnSuccessListener { location: Location? ->
                     if (location != null) {
