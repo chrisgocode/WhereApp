@@ -1,28 +1,18 @@
 package com.example.where.ui.main
 
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -32,11 +22,10 @@ import com.example.where.ui.auth.SignInScreen
 import com.example.where.ui.auth.SignUpScreen
 import com.example.where.ui.theme.WhereTheme
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.example.where.ui.auth.AuthViewModel
-import com.google.firebase.auth.GoogleAuthProvider
+import com.example.where.ui.screens.home.HomeScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,8 +37,8 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
-                    val context = LocalContext.current
                     val authViewModel: AuthViewModel = viewModel()
+                    val context = LocalContext.current
 
                     // Google Sign-In Client Setup
                     val googleSignInClient = remember {
@@ -83,7 +72,7 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(authViewModel.isAuthenticated.value) {
                         if (authViewModel.isAuthenticated.value) {
                             navController.navigate("home") {
-                                popUpTo(0) // Clear back stack
+                                popUpTo("sign_in") { inclusive = true } // Clear back stack up to sign in
                             }
                         }
                     }
@@ -100,6 +89,7 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         startDestination = "sign_in"
                     ) {
+                        // Auth flow
                         composable("sign_in") {
                             SignInScreen(
                                 onSignUpClick = { navController.navigate("sign_up") },
@@ -114,29 +104,21 @@ class MainActivity : ComponentActivity() {
                                 viewModel = authViewModel
                             )
                         }
+                        
+                        // Main app flow (post-authentication)
                         composable("home") {
                             HomeScreen(
-                                onSignOut = { authViewModel.signOut() }
+                                onSignOut = {
+                                    authViewModel.signOut()
+                                    navController.navigate("sign_in") {
+                                        popUpTo("home") { inclusive = true } // Clear back stack
+                                    }
+                                }
                             )
                         }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun HomeScreen(onSignOut: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(text = "Welcome to the Home Screen!")
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onSignOut) {
-            Text("Sign Out")
         }
     }
 }
