@@ -1,8 +1,6 @@
 package com.example.where.ui.main
 
-import android.app.Activity.RESULT_OK
 import android.content.Context
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -41,7 +39,6 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
-import com.google.firebase.auth.GoogleAuthProvider
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
@@ -60,7 +57,7 @@ class MainActivity : ComponentActivity() {
 fun WhereApp(dataStore: DataStore<Preferences>) {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = viewModel()
-    val onboardingViewModel = OnboardingViewModel(dataStore)
+    val onboardingViewModel: OnboardingViewModel = viewModel { OnboardingViewModel(dataStore) }
     val context = LocalContext.current
 
     // Google Sign-In Client Setup
@@ -76,7 +73,7 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == RESULT_OK) {
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
             val data = result.data
             try {
                 val task = GoogleSignIn.getSignedInAccountFromIntent(data)
@@ -87,6 +84,22 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
             } catch (e: ApiException) {
                 Log.e("GoogleSignIn", "Sign-in failed: ${e.statusCode}", e)
                 authViewModel.errorMessage.value = "Google sign-in failed: ${e.statusCode}"
+            }
+        }
+    }
+
+    // Observe auth state changes
+    LaunchedEffect(authViewModel.isAuthenticated.value) {
+        if (authViewModel.isAuthenticated.value && navController.currentDestination?.route in listOf("sign_in", "sign_up")) {
+            // Check if the user has completed onboarding
+            if (onboardingViewModel.onboardingCompleted.value) {
+                navController.navigate("home") {
+                    popUpTo(0) // Clear back stack
+                }
+            } else {
+                navController.navigate("onboarding") {
+                    popUpTo(0) // Clear back stack
+                }
             }
         }
     }
@@ -108,36 +121,41 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
                 onSignUpClick = { navController.navigate("sign_up") },
                 onGoogleSignInClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) },
                 viewModel = authViewModel,
-                onSignInSuccess = { navController.navigate("onboarding") }
+                onSignInSuccess = { /* Navigation handled by LaunchedEffect */ }
             )
         }
-        
+
         composable("sign_up") {
             SignUpScreen(
                 onSignInClick = { navController.navigate("sign_in") },
                 onGoogleSignInClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) },
                 viewModel = authViewModel
             )
-
-            // Observe auth state to navigate to onboarding when signed up
-            if (authViewModel.isAuthenticated.value) {
-                navController.navigate("onboarding") {
-                    popUpTo(0) // Clear back stack
-                }
-            }
+            // Navigation is now handled in the LaunchedEffect above
         }
-        
+
         composable("onboarding") {
             OnboardingScreen(
                 navController = navController,
                 viewModel = onboardingViewModel,
-                onFinish = { navController.navigate("home") }
+                onFinish = {
+                    onboardingViewModel.completeOnboarding()
+                    navController.navigate("home") {
+                        popUpTo(0) // Clear back stack
+                    }
+                }
             )
         }
-        
+
         composable("home") {
             HomeScreen(
-                onSignOut = { authViewModel.signOut() }
+                onSignOut = {
+                    authViewModel.signOut()
+                    onboardingViewModel.resetOnboarding() // Reset onboarding status
+                    navController.navigate("sign_in") {
+                        popUpTo(0) // Clear back stack
+                    }
+                }
             )
         }
     }

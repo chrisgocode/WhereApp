@@ -1,5 +1,6 @@
 package com.example.where.ui.onboarding
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -16,7 +17,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.where.models.UserPreferences
-import kotlinx.coroutines.launch
 
 @Composable
 fun OnboardingScreen(
@@ -24,25 +24,18 @@ fun OnboardingScreen(
     viewModel: OnboardingViewModel = viewModel(),
     onFinish: () -> Unit
 ) {
-    // Create a default UserPreferences
     val defaultPrefs = UserPreferences()
-
-    // Collect state properly without using 'by' delegate
-    // This avoids the property delegate error
     val userPrefsState = viewModel.userPreferences.collectAsState()
-    // Use elvis operator to provide a default if null
     val userPreferences = userPrefsState.value ?: defaultPrefs
-
     var currentPage by remember { mutableStateOf(0) }
 
-    LaunchedEffect(viewModel.onboardingComplete.value) {
-        if (viewModel.onboardingComplete.value) {
+    LaunchedEffect(viewModel.onboardingCompleted.value) {
+        if (viewModel.onboardingCompleted.value) {
             onFinish()
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Display the appropriate page based on currentPage value
         when (currentPage) {
             0 -> CuisineAndDietaryPage(
                 userPreferences = userPreferences,
@@ -58,7 +51,6 @@ fun OnboardingScreen(
             )
         }
 
-        // Show loading indicator
         if (viewModel.isLoading.value) {
             CircularProgressIndicator(
                 modifier = Modifier
@@ -67,7 +59,6 @@ fun OnboardingScreen(
             )
         }
 
-        // Error message
         viewModel.errorMessage.value?.let { error ->
             Snackbar(
                 modifier = Modifier
@@ -111,15 +102,13 @@ fun CuisineAndDietaryPage(
             .padding(horizontal = if (isTablet()) 64.dp else 24.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Progress indicator
         LinearProgressIndicator(
-            progress = 0.5f,
+            progress = { 0.5f },
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Cuisine Preferences Section
         Text(
             text = "Cuisine Preferences",
             style = MaterialTheme.typography.headlineMedium,
@@ -160,7 +149,6 @@ fun CuisineAndDietaryPage(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Dietary Restrictions Section
         Text(
             text = "Dietary Restrictions",
             style = MaterialTheme.typography.headlineMedium,
@@ -201,7 +189,6 @@ fun CuisineAndDietaryPage(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Next button
         Button(
             onClick = {
                 onCuisineChanged(selectedCuisines)
@@ -235,15 +222,13 @@ fun PriceRangePage(
             .padding(horizontal = if (isTablet()) 64.dp else 24.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Progress indicator
         LinearProgressIndicator(
-            progress = 1f,
+            progress = { 1f },
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Price Range Section
         Text(
             text = "Price Range",
             style = MaterialTheme.typography.headlineMedium,
@@ -259,7 +244,6 @@ fun PriceRangePage(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Price range options
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -309,7 +293,6 @@ fun PriceRangePage(
             )
         }
 
-        // Description of selected price
         Text(
             text = when (selectedPrice) {
                 1 -> "Inexpensive restaurants"
@@ -326,7 +309,6 @@ fun PriceRangePage(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Navigation buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -360,7 +342,6 @@ fun PriceRangePage(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SelectableChip(
     text: String,
@@ -377,15 +358,14 @@ fun SelectableChip(
             .height(48.dp),
         shape = MaterialTheme.shapes.small,
         color = backgroundColor,
-        border = ButtonDefaults.outlinedButtonBorder,
+        border = BorderStroke(1.dp, borderColor),
         onClick = onSelected
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
+            contentAlignment = Alignment.Center
         ) {
             Text(
                 text = text,
@@ -397,7 +377,6 @@ fun SelectableChip(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PriceButton(
     price: String,
@@ -407,7 +386,8 @@ fun PriceButton(
     onClick: () -> Unit
 ) {
     val backgroundColor = if (isSelected) Color(0xFF6200EE) else Color.White
-    val textColor = if (isSelected) Color.White else Color.Black // Fixed text color
+    val textColor = if (isSelected) Color.White else Color.Black
+    val borderColor = if (isSelected) Color(0xFF6200EE) else Color.LightGray
 
     Surface(
         modifier = Modifier
@@ -415,7 +395,7 @@ fun PriceButton(
             .height(48.dp),
         shape = MaterialTheme.shapes.small,
         color = backgroundColor,
-        border = ButtonDefaults.outlinedButtonBorder,
+        border = BorderStroke(1.dp, borderColor),
         onClick = onClick
     ) {
         Box(
@@ -432,9 +412,8 @@ fun PriceButton(
     }
 }
 
-// Helper to detect tablet screens
 @Composable
 fun isTablet(): Boolean {
     val configuration = LocalConfiguration.current
-    return configuration.screenWidthDp >= 600 // Tablets typically have 600dp or more in width
+    return configuration.screenWidthDp >= 600
 }

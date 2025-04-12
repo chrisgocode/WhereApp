@@ -1,6 +1,6 @@
-// Create an OnboardingViewModel to manage the data
 package com.example.where.ui.onboarding
 
+import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,13 +10,13 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
-import kotlinx.coroutines.flow.first
 
 class OnboardingViewModel(
     private val dataStore: DataStore<Preferences>
@@ -24,8 +24,7 @@ class OnboardingViewModel(
 
     private val _userPreferences = MutableStateFlow(UserPreferences())
     val userPreferences: StateFlow<UserPreferences> = _userPreferences.asStateFlow()
-
-    val onboardingComplete = mutableStateOf(false)
+    val onboardingCompleted = mutableStateOf(false)
     val isLoading = mutableStateOf(false)
     val errorMessage = mutableStateOf<String?>(null)
 
@@ -39,43 +38,88 @@ class OnboardingViewModel(
     init {
         viewModelScope.launch {
             loadSavedPreferences()
+            checkOnboardingStatus()
+        }
+    }
+
+    private suspend fun checkOnboardingStatus() {
+        try {
+            val preferences = dataStore.data.first()
+            val completed = preferences[ONBOARDING_COMPLETED_KEY] == "true"
+            onboardingCompleted.value = completed
+            if (completed) {
+                Log.d("OnboardingViewModel", "Onboarding marked as completed in DataStore")
+            } else {
+                Log.d("OnboardingViewModel", "Onboarding not completed in DataStore")
+            }
+        } catch (e: Exception) {
+            errorMessage.value = "Failed to check onboarding status: ${e.message}"
+            Log.e("OnboardingViewModel", "Error checking onboarding status", e)
+        }
+    }
+
+    fun saveOnboardingCompleted() {
+        viewModelScope.launch {
+            try {
+                dataStore.edit { preferences ->
+                    preferences[ONBOARDING_COMPLETED_KEY] = "true"
+                }
+                onboardingCompleted.value = true
+                Log.d("OnboardingViewModel", "Onboarding completed saved to DataStore")
+            } catch (e: Exception) {
+                errorMessage.value = "Failed to save onboarding status: ${e.message}"
+                Log.e("OnboardingViewModel", "Error saving onboarding status", e)
+            }
+        }
+    }
+
+    fun resetOnboarding() {
+        viewModelScope.launch {
+            try {
+                dataStore.edit { preferences ->
+                    preferences[ONBOARDING_COMPLETED_KEY] = "false"
+                    preferences.remove(DIETARY_RESTRICTIONS_KEY)
+                    preferences.remove(CUISINE_PREFERENCES_KEY)
+                    preferences.remove(PRICE_RANGE_KEY)
+                }
+                onboardingCompleted.value = false
+                _userPreferences.value = UserPreferences()
+                Log.d("OnboardingViewModel", "Onboarding and preferences reset in DataStore")
+            } catch (e: Exception) {
+                errorMessage.value = "Failed to reset onboarding: ${e.message}"
+                Log.e("OnboardingViewModel", "Error resetting onboarding", e)
+            }
         }
     }
 
     private suspend fun loadSavedPreferences() {
         try {
             val preferences = dataStore.data.first()
-            
+
             val dietaryRestrictionsJson = preferences[DIETARY_RESTRICTIONS_KEY] ?: "[]"
             val cuisinePreferencesJson = preferences[CUISINE_PREFERENCES_KEY] ?: "[]"
             val priceRange = preferences[PRICE_RANGE_KEY] ?: 2
-            
-            // Convert JSON strings back to lists
+
             val dietaryRestrictions = parseJsonToList(dietaryRestrictionsJson)
             val cuisinePreferences = parseJsonToList(cuisinePreferencesJson)
-            
+
             _userPreferences.value = UserPreferences(
                 dietaryRestrictions = dietaryRestrictions,
                 cuisinePreferences = cuisinePreferences,
                 priceRange = priceRange
             )
-            
-            // Check if onboarding was previously completed
-            val completed = preferences[ONBOARDING_COMPLETED_KEY]
-            onboardingComplete.value = completed == "true"
-            
+            Log.d("OnboardingViewModel", "Loaded preferences: $dietaryRestrictions, $cuisinePreferences, $priceRange")
         } catch (e: Exception) {
             errorMessage.value = "Failed to load preferences: ${e.message}"
+            Log.e("OnboardingViewModel", "Error loading preferences", e)
         }
     }
 
     private fun parseJsonToList(json: String): List<String> {
-        // Simple JSON array parsing - in a real app you would use a proper JSON library
         return json.trim('[', ']').split(",").map { it.trim('"', ' ') }.filter { it.isNotEmpty() }
     }
 
     private fun listToJson(list: List<String>): String {
-        // Simple JSON array creation
         return list.joinToString(", ", "[", "]") { "\"$it\"" }
     }
 
@@ -96,25 +140,35 @@ class OnboardingViewModel(
 
     private fun savePreference(key: Preferences.Key<String>, value: String) {
         viewModelScope.launch {
-            dataStore.edit { preferences ->
-                preferences[key] = value
+            try {
+                dataStore.edit { preferences ->
+                    preferences[key] = value
+                }
+                Log.d("OnboardingViewModel", "Saved preference: $key = $value")
+            } catch (e: Exception) {
+                errorMessage.value = "Failed to save preference: ${e.message}"
+                Log.e("OnboardingViewModel", "Error saving preference", e)
             }
         }
     }
 
     private fun savePreference(key: Preferences.Key<Int>, value: Int) {
         viewModelScope.launch {
-            dataStore.edit { preferences ->
-                preferences[key] = value
+            try {
+                dataStore.edit { preferences ->
+                    preferences[key] = value
+                }
+                Log.d("OnboardingViewModel", "Saved preference: $key = $value")
+            } catch (e: Exception) {
+                errorMessage.value = "Failed to save preference: ${e.message}"
+                Log.e("OnboardingViewModel", "Error saving preference", e)
             }
         }
     }
 
     fun completeOnboarding() {
         isLoading.value = true
-        
         try {
-            // Save to Firestore
             val user = FirebaseAuth.getInstance().currentUser
             if (user != null) {
                 val db = FirebaseFirestore.getInstance()
@@ -126,30 +180,33 @@ class OnboardingViewModel(
                     "cuisinePreferences" to _userPreferences.value.cuisinePreferences,
                     "priceRange" to _userPreferences.value.priceRange
                 )
-                
+
                 db.collection("users").document(user.uid)
                     .set(userData)
                     .addOnSuccessListener {
-                        // Mark onboarding as complete
                         viewModelScope.launch {
                             dataStore.edit { preferences ->
                                 preferences[ONBOARDING_COMPLETED_KEY] = "true"
                             }
-                            onboardingComplete.value = true
+                            onboardingCompleted.value = true
                             isLoading.value = false
+                            Log.d("OnboardingViewModel", "Onboarding completed and saved to Firestore")
                         }
                     }
                     .addOnFailureListener { e ->
                         errorMessage.value = "Failed to save preferences: ${e.message}"
                         isLoading.value = false
+                        Log.e("OnboardingViewModel", "Error saving to Firestore", e)
                     }
             } else {
                 errorMessage.value = "User not authenticated"
                 isLoading.value = false
+                Log.e("OnboardingViewModel", "No authenticated user found")
             }
         } catch (e: Exception) {
             errorMessage.value = "An error occurred: ${e.message}"
             isLoading.value = false
+            Log.e("OnboardingViewModel", "Unexpected error during onboarding", e)
         }
     }
 }
