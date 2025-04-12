@@ -43,6 +43,7 @@ android {
 dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
     implementation("com.google.firebase:firebase-analytics")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation(libs.play.services.auth) // Add this line
     implementation("androidx.navigation:navigation-compose:2.7.6")
     implementation(libs.firebase.auth.ktx)
@@ -57,6 +58,9 @@ dependencies {
     implementation(libs.firebase.auth.ktx)
     implementation(libs.androidx.credentials)
     implementation(libs.googleid)
+    implementation(libs.androidx.datastore.core.android)
+    implementation(libs.androidx.datastore.preferences.core.android)
+    implementation(libs.firebase.firestore.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
