@@ -23,7 +23,6 @@ import com.example.where.R
 fun SignInScreen(
     onSignUpClick: () -> Unit,
     onGoogleSignInClick: () -> Unit,
-    onSignInSuccess: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AuthViewModel = viewModel()
 ) {
@@ -36,7 +35,7 @@ fun SignInScreen(
     LaunchedEffect(viewModel.isAuthenticated.value) {
         if (viewModel.isAuthenticated.value) {
             isLoading = false
-            onSignInSuccess()
+            // Removed onSignInSuccess call - navigation is handled in MainActivity
         }
     }
 

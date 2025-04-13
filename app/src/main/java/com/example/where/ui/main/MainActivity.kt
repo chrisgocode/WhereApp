@@ -135,8 +135,7 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
             SignInScreen(
                 onSignUpClick = { navController.navigate("sign_up") },
                 onGoogleSignInClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) },
-                viewModel = authViewModel,
-                onSignInSuccess = { /* TODO: Remove this */ }
+                viewModel = authViewModel
             )
         }
 
@@ -151,8 +150,8 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
 
         composable("onboarding") {
             OnboardingScreen(
-                navController = navController,
                 viewModel = onboardingViewModel,
+                navController = navController,
                 onFinish = {
                     onboardingViewModel.completeOnboarding()
                     navController.navigate("home") {
@@ -167,7 +166,6 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
             HomeScreen(
                 onSignOut = {
                     authViewModel.signOut()
-                    onboardingViewModel.resetOnboarding() // Reset onboarding status
                     navController.navigate("sign_in") {
                         popUpTo(0) // Clear back stack
                     }
