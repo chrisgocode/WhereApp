@@ -10,7 +10,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -33,6 +32,7 @@ fun SignUpScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var termsAccepted by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     // Handle authentication state changes
     LaunchedEffect(viewModel.isAuthenticated.value) {
@@ -41,11 +41,11 @@ fun SignUpScreen(
         }
     }
 
-    // Handle errors
+    // Handle errors from ViewModel
     LaunchedEffect(viewModel.errorMessage.value) {
-        viewModel.errorMessage.value?.let {
+        viewModel.errorMessage.value?.let { message ->
             isLoading = false
-            // Error handling (e.g., show Snackbar)
+            errorMessage = message
         }
     }
 
@@ -56,7 +56,7 @@ fun SignUpScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Logo and title (unchanged from your original)
+        // Logo and title
         Image(
             painter = painterResource(id = R.drawable.ic_location),
             contentDescription = "Location Icon",
@@ -84,7 +84,8 @@ fun SignUpScreen(
             onValueChange = { fullName = it },
             label = { Text("Full Name") },
             placeholder = { Text("John Doe") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            isError = errorMessage != null && fullName.isBlank()
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -96,12 +97,13 @@ fun SignUpScreen(
             label = { Text("Email") },
             placeholder = { Text("you@example.com") },
             modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            isError = errorMessage != null && email.isBlank()
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Password Field (with show/hide text button as in your original)
+        // Password Field
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
@@ -120,7 +122,8 @@ fun SignUpScreen(
                         color = Color(0xFF6200EE)
                     )
                 }
-            }
+            },
+            isError = errorMessage != null && password.length < 8
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -154,26 +157,49 @@ fun SignUpScreen(
         Button(
             onClick = {
                 if (termsAccepted) {
-                    isLoading = true
-                    viewModel.signUpWithEmail(fullName, email, password)
+                    if (fullName.isBlank()) {
+                        errorMessage = "Please enter your full name"
+                    } else if (email.isBlank() || !email.contains("@")) {
+                        errorMessage = "Please enter a valid email"
+                    } else if (password.length < 8) {
+                        errorMessage = "Password must be at least 8 characters long"
+                    } else {
+                        isLoading = true
+                        errorMessage = null
+                        viewModel.signUpWithEmail(fullName, email, password)
+                    }
+                } else {
+                    errorMessage = "Please accept the terms and conditions"
                 }
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE)),
-            enabled = termsAccepted && !isLoading
+            enabled = !isLoading
         ) {
             if (isLoading) {
-                CircularProgressIndicator(color = Color.White)
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
             } else {
                 Text("Sign Up", color = Color.White)
             }
         }
 
+        // Error Message Snackbar
+        errorMessage?.let { message ->
+            Spacer(modifier = Modifier.height(16.dp))
+            Snackbar(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                containerColor = MaterialTheme.colorScheme.error,
+                contentColor = MaterialTheme.colorScheme.onError
+            ) {
+                Text(message)
+            }
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Google Sign-In Button (now using callback)
+        // Google Sign-In Button
         Button(
             onClick = { onGoogleSignInClick() },
             modifier = Modifier
@@ -214,9 +240,8 @@ fun SignUpScreen(
     }
 }
 
-// Helper to detect tablet screens
 @Composable
 fun isTablet(): Boolean {
     val configuration = LocalConfiguration.current
-    return configuration.screenWidthDp >= 600 // Tablets typically have 600dp or more in width
+    return configuration.screenWidthDp >= 600
 }

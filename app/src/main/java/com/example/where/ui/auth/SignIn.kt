@@ -9,7 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -18,10 +18,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.where.R
+
 @Composable
 fun SignInScreen(
     onSignUpClick: () -> Unit,
     onGoogleSignInClick: () -> Unit,
+    onSignInSuccess: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AuthViewModel = viewModel()
 ) {
@@ -34,6 +36,7 @@ fun SignInScreen(
     LaunchedEffect(viewModel.isAuthenticated.value) {
         if (viewModel.isAuthenticated.value) {
             isLoading = false
+            onSignInSuccess()
         }
     }
 
@@ -52,7 +55,7 @@ fun SignInScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Logo and title (unchanged from your original)
+        // Logo and title
         Image(
             painter = painterResource(id = R.drawable.ic_location),
             contentDescription = "Location Icon",
@@ -60,13 +63,13 @@ fun SignInScreen(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Welcome to Where?",
+            text = "Sign In",
             style = MaterialTheme.typography.headlineMedium,
             fontSize = if (isTablet()) 32.sp else 24.sp
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Sign in to continue to your account",
+            text = "Sign in to share your location with friends",
             style = MaterialTheme.typography.bodyMedium,
             color = Color.Gray,
             fontSize = if (isTablet()) 18.sp else 14.sp
@@ -86,7 +89,7 @@ fun SignInScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Password Field (with show/hide text button as in your original)
+        // Password Field
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
@@ -108,15 +111,6 @@ fun SignInScreen(
             }
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Forgot password?",
-            color = Color(0xFF6200EE),
-            modifier = Modifier
-                .align(Alignment.End)
-                .clickable { /* Handle forgot password */ }
-        )
-
         Spacer(modifier = Modifier.height(32.dp))
 
         // Sign In Button
@@ -129,7 +123,7 @@ fun SignInScreen(
                 .fillMaxWidth()
                 .height(48.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE)),
-            enabled = email.isNotBlank() && password.isNotBlank() && !isLoading
+            enabled = !isLoading
         ) {
             if (isLoading) {
                 CircularProgressIndicator(color = Color.White)
@@ -140,7 +134,7 @@ fun SignInScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Google Sign-In Button (unchanged from your original)
+        // Google Sign-In Button
         Button(
             onClick = { onGoogleSignInClick() },
             modifier = Modifier
