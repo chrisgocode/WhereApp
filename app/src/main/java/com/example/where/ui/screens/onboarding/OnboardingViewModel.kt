@@ -27,6 +27,10 @@ class OnboardingViewModel(
     val onboardingCompleted = mutableStateOf(false)
     val isLoading = mutableStateOf(false)
     val errorMessage = mutableStateOf<String?>(null)
+    
+    // Add a flag to track if initialization is complete
+    private val _initializationComplete = MutableStateFlow(false)
+    val initializationComplete: StateFlow<Boolean> = _initializationComplete.asStateFlow()
 
     companion object {
         private val DIETARY_RESTRICTIONS_KEY = stringPreferencesKey("dietary_restrictions")
@@ -39,6 +43,8 @@ class OnboardingViewModel(
         viewModelScope.launch {
             loadSavedPreferences()
             checkOnboardingStatus()
+            _initializationComplete.value = true
+            Log.d("OnboardingViewModel", "Initialization complete, onboarding status: ${onboardingCompleted.value}")
         }
     }
 
@@ -169,6 +175,21 @@ class OnboardingViewModel(
     fun completeOnboarding() {
         isLoading.value = true
         try {
+            // First set the onboarding completion locally
+            viewModelScope.launch {
+                try {
+                    dataStore.edit { preferences ->
+                        preferences[ONBOARDING_COMPLETED_KEY] = "true"
+                    }
+                    onboardingCompleted.value = true
+                    Log.d("OnboardingViewModel", "Onboarding marked as completed locally")
+                } catch (e: Exception) {
+                    Log.e("OnboardingViewModel", "Error setting onboarding locally", e)
+                    // Continue with Firestore sync attempt even if local save fails
+                }
+            }
+            
+            // Then sync to Firestore
             val user = FirebaseAuth.getInstance().currentUser
             if (user != null) {
                 val db = FirebaseFirestore.getInstance()
@@ -178,25 +199,21 @@ class OnboardingViewModel(
                     "displayName" to user.displayName,
                     "dietaryRestrictions" to _userPreferences.value.dietaryRestrictions,
                     "cuisinePreferences" to _userPreferences.value.cuisinePreferences,
-                    "priceRange" to _userPreferences.value.priceRange
+                    "priceRange" to _userPreferences.value.priceRange,
+                    "onboardingCompleted" to true // Added this flag to sync onboarding
                 )
 
                 db.collection("users").document(user.uid)
                     .set(userData)
                     .addOnSuccessListener {
-                        viewModelScope.launch {
-                            dataStore.edit { preferences ->
-                                preferences[ONBOARDING_COMPLETED_KEY] = "true"
-                            }
-                            onboardingCompleted.value = true
-                            isLoading.value = false
-                            Log.d("OnboardingViewModel", "Onboarding completed and saved to Firestore")
-                        }
+                        isLoading.value = false
+                        Log.d("OnboardingViewModel", "User preferences saved to Firestore")
                     }
                     .addOnFailureListener { e ->
-                        errorMessage.value = "Failed to save preferences: ${e.message}"
+                        errorMessage.value = "Failed to save preferences to cloud: ${e.message}"
                         isLoading.value = false
                         Log.e("OnboardingViewModel", "Error saving to Firestore", e)
+                        // Onboarding still completes locally even if Firestore sync fails
                     }
             } else {
                 errorMessage.value = "User not authenticated"

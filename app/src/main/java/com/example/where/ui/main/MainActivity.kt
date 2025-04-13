@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +19,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +72,13 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
     val authViewModel: AuthViewModel = viewModel()
     val onboardingViewModel: OnboardingViewModel = viewModel { OnboardingViewModel(dataStore) }
     val context = LocalContext.current
+    
+    // Track if initial destination has been determined
+    var isInitializing by remember { mutableStateOf(true) }
+    var startDestination by remember { mutableStateOf("sign_in") }
+
+    // Collect the initialization state
+    val initializationComplete by onboardingViewModel.initializationComplete.collectAsState(initial = false)
 
     // Google Sign-In Client Setup
     val googleSignInClient = remember {
@@ -95,28 +108,63 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
         }
     }
 
-    // Observe auth state changes
-    LaunchedEffect(authViewModel.isAuthenticated.value, onboardingViewModel.onboardingCompleted.value) {
-         if (authViewModel.isAuthenticated.value && navController.currentDestination?.route in listOf("sign_in", "sign_up", "onboarding")) {
-            // Check if the user has completed onboarding
-            if (onboardingViewModel.onboardingCompleted.value) {
-                navController.navigate("home") {
-                    popUpTo(0) // Clear back stack
+    // Check authentication and onboarding status before showing any UI
+    LaunchedEffect(authViewModel.isAuthenticated.value, onboardingViewModel.onboardingCompleted.value, initializationComplete) {
+        // Only proceed if initialization is complete
+        if (initializationComplete) {
+            // Only proceed if both values are initialized
+            if (authViewModel.isAuthenticated.value) {
+                if (onboardingViewModel.onboardingCompleted.value) {
+                    startDestination = "home"
+                    Log.d("WhereApp", "User authenticated and onboarding complete. Navigating to home.")
+                } else {
+                    startDestination = "onboarding"
+                    Log.d("WhereApp", "User authenticated but onboarding incomplete. Navigating to onboarding.")
                 }
             } else {
-                 if (navController.currentDestination?.route != "onboarding") {
-                    navController.navigate("onboarding") {
-                         popUpTo(0) // Clear back stack
-                    }
-                 }
+                startDestination = "sign_in"
+                Log.d("WhereApp", "User not authenticated. Navigating to sign in.")
             }
-        } else if (!authViewModel.isAuthenticated.value && navController.currentDestination?.route !in listOf("sign_in", "sign_up")) {
-             navController.navigate("sign_in") {
-                 popUpTo(0) // Clear back stack
-             }
+            
+            // Mark initialization as complete
+            isInitializing = false
         }
     }
 
+    if (isInitializing) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // TODO: Add a loading indicator or splash screen here
+        }
+        return
+    }
+    
+    // Runtime navigation - separate from initialization
+    LaunchedEffect(authViewModel.isAuthenticated.value, onboardingViewModel.onboardingCompleted.value) {
+        // Only handle navigation if we have a current destination
+        navController.currentDestination?.let { currentDestination ->
+            if (authViewModel.isAuthenticated.value) {
+                if (onboardingViewModel.onboardingCompleted.value && 
+                    currentDestination.route == "onboarding") {
+                    // If onboarding is complete but we're on onboarding screen, go to home
+                    navController.navigate("home") {
+                        popUpTo(0)
+                    }
+                } else if (!onboardingViewModel.onboardingCompleted.value && 
+                          currentDestination.route != "onboarding" &&
+                          currentDestination.route in listOf("sign_in", "sign_up")) {
+                    // If onboarding not complete and we're not on onboarding screen, go to onboarding
+                    navController.navigate("onboarding") {
+                        popUpTo(0)
+                    }
+                }
+            } else if (currentDestination.route !in listOf("sign_in", "sign_up")) {
+                // If not authenticated and not on auth screens, go to sign in
+                navController.navigate("sign_in") {
+                    popUpTo(0)
+                }
+            }
+        }
+    }
 
     // Observe error messages
     LaunchedEffect(authViewModel.errorMessage.value) {
@@ -128,7 +176,7 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
 
     NavHost(
         navController = navController,
-        startDestination = "sign_in"
+        startDestination = startDestination
     ) {
         // Auth flow
         composable("sign_in") {
