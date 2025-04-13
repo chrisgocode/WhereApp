@@ -17,6 +17,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.flow.collect
 
 class OnboardingViewModel(
     private val dataStore: DataStore<Preferences>
@@ -40,24 +42,87 @@ class OnboardingViewModel(
     }
 
     init {
+        Log.d("OnboardingViewModel", "Initializing with onboardingCompleted=${onboardingCompleted.value}")
         viewModelScope.launch {
+            // Initial load
             loadSavedPreferences()
             checkOnboardingStatus()
             _initializationComplete.value = true
             Log.d("OnboardingViewModel", "Initialization complete, onboarding status: ${onboardingCompleted.value}")
+            
+            // Continuously observe DataStore changes
+            dataStore.data.collect { preferences ->
+                val onboardingStatus = preferences[ONBOARDING_COMPLETED_KEY] == "true"
+                if (onboardingCompleted.value != onboardingStatus) {
+                    Log.d("OnboardingViewModel", "DataStore onboarding status changed: $onboardingStatus")
+                    onboardingCompleted.value = onboardingStatus
+                }
+            }
         }
     }
 
     private suspend fun checkOnboardingStatus() {
         try {
+            // Get state from DataStore
             val preferences = dataStore.data.first()
-            val completed = preferences[ONBOARDING_COMPLETED_KEY] == "true"
-            onboardingCompleted.value = completed
-            if (completed) {
-                Log.d("OnboardingViewModel", "Onboarding marked as completed in DataStore")
+            var completed = preferences[ONBOARDING_COMPLETED_KEY] == "true"
+            Log.d("OnboardingViewModel", "Initial DataStore onboarding status: $completed")
+            
+            val currentUser = FirebaseAuth.getInstance().currentUser
+            if (currentUser != null) {
+                Log.d("OnboardingViewModel", "Checking Firestore for user ${currentUser.uid}")
+                try {
+                    val db = FirebaseFirestore.getInstance()
+                    val documentSnapshot = db.collection("users").document(currentUser.uid)
+                        .get().await()
+                    
+                    if (documentSnapshot.exists()) {
+                        // Get Firestore status
+                        val firestoreCompleted = documentSnapshot.getBoolean("onboardingCompleted") ?: false
+                        val isNewlyCreated = System.currentTimeMillis() - 
+                            (documentSnapshot.getTimestamp("createdAt")?.toDate()?.time ?: 0) < 60000
+                        
+                        Log.d("OnboardingViewModel", "Firestore: completed=$firestoreCompleted, newAccount=$isNewlyCreated")
+                        
+                        // Trust Firestore for all accounts
+                        completed = firestoreCompleted
+                        
+                        // Sync DataStore with Firestore if needed
+                        if (firestoreCompleted && preferences[ONBOARDING_COMPLETED_KEY] != "true") {
+                            dataStore.edit { prefs ->
+                                prefs[ONBOARDING_COMPLETED_KEY] = "true"
+                            }
+                        } else if (!firestoreCompleted && preferences[ONBOARDING_COMPLETED_KEY] == "true") {
+                            if (!isNewlyCreated) {
+                                try {
+                                    db.collection("users").document(currentUser.uid)
+                                        .update("onboardingCompleted", true)
+                                } catch (e: Exception) {
+                                    Log.e("OnboardingViewModel", "Failed to update Firestore", e)
+                                }
+                            }
+                        }
+                    } else {
+                        Log.d("OnboardingViewModel", "No user document in Firestore")
+                        completed = false
+                    }
+                } catch (e: Exception) {
+                    Log.e("OnboardingViewModel", "Error checking Firestore", e)
+                }
             } else {
-                Log.d("OnboardingViewModel", "Onboarding not completed in DataStore")
+                // Reset for unauthenticated users
+                Log.d("OnboardingViewModel", "No authenticated user, resetting onboarding to false")
+                completed = false
+                
+                if (preferences[ONBOARDING_COMPLETED_KEY] == "true") {
+                    dataStore.edit { prefs ->
+                        prefs[ONBOARDING_COMPLETED_KEY] = "false"
+                    }
+                }
             }
+            
+            Log.d("OnboardingViewModel", "Final onboarding status: $completed")
+            onboardingCompleted.value = completed
         } catch (e: Exception) {
             errorMessage.value = "Failed to check onboarding status: ${e.message}"
             Log.e("OnboardingViewModel", "Error checking onboarding status", e)
@@ -224,6 +289,33 @@ class OnboardingViewModel(
             errorMessage.value = "An error occurred: ${e.message}"
             isLoading.value = false
             Log.e("OnboardingViewModel", "Unexpected error during onboarding", e)
+        }
+    }
+
+    // Function to force reload onboarding status
+    fun forceReloadOnboardingStatus() {
+        Log.d("OnboardingViewModel", "Force reloading onboarding status")
+        viewModelScope.launch {
+            checkOnboardingStatus()
+        }
+    }
+
+    // Reset state on sign out
+    fun resetOnSignOut() {
+        viewModelScope.launch {
+            // Reset UI state immediately
+            onboardingCompleted.value = false
+            _userPreferences.value = UserPreferences() // Reset to default empty preferences
+            
+            try {
+                // Clear all DataStore preferences
+                dataStore.edit { preferences ->
+                    preferences.clear() // Clear all stored preferences
+                }
+                Log.d("OnboardingViewModel", "Cleared all user preferences on sign out")
+            } catch (e: Exception) {
+                Log.e("OnboardingViewModel", "Failed to clear user preferences", e)
+            }
         }
     }
 }

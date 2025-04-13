@@ -48,7 +48,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -99,7 +99,7 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
                 val task = GoogleSignIn.getSignedInAccountFromIntent(data)
                 val account = task.getResult(ApiException::class.java)
                 account.idToken?.let { token ->
-                    authViewModel.handleGoogleSignIn(token)
+                    authViewModel.handleGoogleSignIn(token, dataStore)
                 }
             } catch (e: ApiException) {
                 Log.e("GoogleSignIn", "Sign-in failed: ${e.statusCode}", e)
@@ -109,24 +109,27 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
     }
 
     // Check authentication and onboarding status before showing any UI
-    LaunchedEffect(authViewModel.isAuthenticated.value, onboardingViewModel.onboardingCompleted.value, initializationComplete) {
-        // Only proceed if initialization is complete
+    LaunchedEffect(authViewModel.isAuthenticated.value, onboardingViewModel.onboardingCompleted.value, initializationComplete, authViewModel.isNewAccount.value) {
+        // Check navigation state
+        Log.d("WhereApp", "Nav state: auth=${authViewModel.isAuthenticated.value}, onboarding=${onboardingViewModel.onboardingCompleted.value}, init=$initializationComplete")
+        
         if (initializationComplete) {
-            // Only proceed if both values are initialized
             if (authViewModel.isAuthenticated.value) {
-                if (onboardingViewModel.onboardingCompleted.value) {
+                if (authViewModel.isNewAccount.value) {
+                    startDestination = "onboarding"
+                    Log.d("WhereApp", "New user -> onboarding")
+                } else if (onboardingViewModel.onboardingCompleted.value) {
                     startDestination = "home"
-                    Log.d("WhereApp", "User authenticated and onboarding complete. Navigating to home.")
+                    Log.d("WhereApp", "Existing user with completed onboarding -> home")
                 } else {
                     startDestination = "onboarding"
-                    Log.d("WhereApp", "User authenticated but onboarding incomplete. Navigating to onboarding.")
+                    Log.d("WhereApp", "Existing user with incomplete onboarding -> onboarding")
                 }
             } else {
                 startDestination = "sign_in"
-                Log.d("WhereApp", "User not authenticated. Navigating to sign in.")
+                Log.d("WhereApp", "Not authenticated -> sign_in")
             }
             
-            // Mark initialization as complete
             isInitializing = false
         }
     }
@@ -139,11 +142,18 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
     }
     
     // Runtime navigation - separate from initialization
-    LaunchedEffect(authViewModel.isAuthenticated.value, onboardingViewModel.onboardingCompleted.value) {
+    LaunchedEffect(authViewModel.isAuthenticated.value, onboardingViewModel.onboardingCompleted.value, authViewModel.isNewAccount.value) {
         // Only handle navigation if we have a current destination
         navController.currentDestination?.let { currentDestination ->
             if (authViewModel.isAuthenticated.value) {
-                if (onboardingViewModel.onboardingCompleted.value && 
+                if (authViewModel.isNewAccount.value && currentDestination.route != "onboarding") {
+                    // Newly created account should go to onboarding
+                    navController.navigate("onboarding") {
+                        popUpTo(0) // Clear back stack
+                    }
+                    // Reset new account flag after navigation
+                    authViewModel.isNewAccount.value = false
+                } else if (onboardingViewModel.onboardingCompleted.value && 
                     currentDestination.route == "onboarding") {
                     // If onboarding is complete but we're on onboarding screen, go to home
                     navController.navigate("home") {
@@ -151,8 +161,9 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
                     }
                 } else if (!onboardingViewModel.onboardingCompleted.value && 
                           currentDestination.route != "onboarding" &&
-                          currentDestination.route in listOf("sign_in", "sign_up")) {
-                    // If onboarding not complete and we're not on onboarding screen, go to onboarding
+                          currentDestination.route != "sign_in" && 
+                          currentDestination.route != "sign_up") {
+                    // If onboarding not complete and we're not on onboarding or auth screens, go to onboarding
                     navController.navigate("onboarding") {
                         popUpTo(0)
                     }
@@ -183,7 +194,8 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
             SignInScreen(
                 onSignUpClick = { navController.navigate("sign_up") },
                 onGoogleSignInClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) },
-                viewModel = authViewModel
+                viewModel = authViewModel,
+                dataStore = dataStore
             )
         }
 
@@ -191,9 +203,10 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
             SignUpScreen(
                 onSignInClick = { navController.navigate("sign_in") },
                 onGoogleSignInClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) },
-                viewModel = authViewModel
+                viewModel = authViewModel,
+                dataStore = dataStore,
+                forceReloadOnboarding = { onboardingViewModel.forceReloadOnboardingStatus() }
             )
-            // Navigation is now handled in the LaunchedEffect above
         }
 
         composable("onboarding") {
@@ -213,7 +226,8 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
         composable("home") {
             HomeScreen(
                 onSignOut = {
-                    authViewModel.signOut()
+                    authViewModel.signOut(dataStore)
+                    onboardingViewModel.resetOnSignOut()
                     navController.navigate("sign_in") {
                         popUpTo(0) // Clear back stack
                     }

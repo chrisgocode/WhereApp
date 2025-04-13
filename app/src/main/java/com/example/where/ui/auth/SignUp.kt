@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -17,14 +18,19 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import com.example.where.R
+import com.example.where.ui.main.dataStore
 
 @Composable
 fun SignUpScreen(
     onSignInClick: () -> Unit,
     onGoogleSignInClick: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: AuthViewModel = viewModel()
+    viewModel: AuthViewModel = viewModel(),
+    dataStore: DataStore<Preferences>? = null,
+    forceReloadOnboarding: (() -> Unit)? = null
 ) {
     var fullName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -33,6 +39,10 @@ fun SignUpScreen(
     var termsAccepted by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    
+    // Get DataStore from context if not provided
+    val context = LocalContext.current
+    val effectiveDataStore = dataStore ?: (context as? androidx.activity.ComponentActivity)?.dataStore
 
     // Handle authentication state changes
     LaunchedEffect(viewModel.isAuthenticated.value) {
@@ -166,7 +176,12 @@ fun SignUpScreen(
                     } else {
                         isLoading = true
                         errorMessage = null
-                        viewModel.signUpWithEmail(fullName, email, password)
+                        if (effectiveDataStore != null) {
+                            viewModel.signUpWithEmail(fullName, email, password, effectiveDataStore, forceReloadOnboarding)
+                        } else {
+                            errorMessage = "Error: Unable to access DataStore"
+                            isLoading = false
+                        }
                     }
                 } else {
                     errorMessage = "Please accept the terms and conditions"

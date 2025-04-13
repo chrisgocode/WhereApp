@@ -18,13 +18,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.where.R
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 
 @Composable
 fun SignInScreen(
     onSignUpClick: () -> Unit,
     onGoogleSignInClick: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: AuthViewModel = viewModel()
+    viewModel: AuthViewModel = viewModel(),
+    dataStore: DataStore<Preferences>? = null
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -116,7 +119,7 @@ fun SignInScreen(
         Button(
             onClick = {
                 isLoading = true
-                viewModel.signInWithEmail(email, password)
+                viewModel.signInWithEmail(email, password, dataStore)
             },
             modifier = Modifier
                 .fillMaxWidth()
