@@ -14,6 +14,12 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import com.google.firebase.firestore.FirebaseFirestore
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import com.google.firebase.Timestamp
 
 class AuthViewModel : ViewModel() {
     private val auth: FirebaseAuth = Firebase.auth
@@ -21,13 +27,27 @@ class AuthViewModel : ViewModel() {
     val isLoading = mutableStateOf(false)
     val errorMessage = mutableStateOf<String?>(null)
     val currentUser = mutableStateOf(auth.currentUser)
+    
+    // Add a flag to track newly created accounts
+    val isNewAccount = mutableStateOf(false)
+    
+    // Key for onboarding status in DataStore
+    companion object {
+        private val ONBOARDING_COMPLETED_KEY = stringPreferencesKey("onboarding_completed")
+    }
 
     init {
         Log.d("AuthViewModel", "Initialized with isAuthenticated: ${isAuthenticated.value}")
     }
 
     // Email/Password Authentication
-    fun signUpWithEmail(name: String, email: String, password: String) {
+    fun signUpWithEmail(
+        name: String, 
+        email: String, 
+        password: String, 
+        dataStore: DataStore<Preferences>,
+        forceReloadOnboarding: (() -> Unit)? = null
+    ) {
         viewModelScope.launch {
             try {
                 isLoading.value = true
@@ -38,9 +58,52 @@ class AuthViewModel : ViewModel() {
                         .setDisplayName(name)
                         .build()
                 )?.await()
+                
+                // Mark as new account
+                isNewAccount.value = true
+                Log.d("AuthViewModel", "New account created for $email")
+                
+                // Reset onboarding in DataStore
+                try {
+                    dataStore.edit { preferences ->
+                        preferences[ONBOARDING_COMPLETED_KEY] = "false"
+                    }
+                    
+                    // Force reload if callback provided
+                    forceReloadOnboarding?.invoke()
+                } catch (e: Exception) {
+                    Log.e("AuthViewModel", "Failed to reset onboarding in DataStore", e)
+                }
+                
+                // Create Firestore document
+                val user = auth.currentUser
+                if (user != null) {
+                    val db = FirebaseFirestore.getInstance()
+                    val userData = hashMapOf(
+                        "uid" to user.uid,
+                        "email" to email,
+                        "displayName" to name,
+                        "dietaryRestrictions" to listOf<String>(),
+                        "cuisinePreferences" to listOf<String>(),
+                        "priceRange" to 2,
+                        "onboardingCompleted" to false,
+                        "createdAt" to Timestamp.now(),
+                        "updatedAt" to Timestamp.now()
+                    )
+                    
+                    db.collection("users").document(user.uid)
+                        .set(userData)
+                        .addOnSuccessListener {
+                            Log.d("AuthViewModel", "User document created in Firestore")
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e("AuthViewModel", "Error creating user document", e)
+                        }
+                }
+                
                 isAuthenticated.value = true
                 currentUser.value = auth.currentUser
-                Log.d("AuthViewModel", "Sign-up successful for ${email}")
+                Log.d("AuthViewModel", "Sign-up successful for $email")
             } catch (e: Exception) {
                 errorMessage.value = e.message ?: "Registration failed"
                 Log.e("AuthViewModel", "Sign-up failed: ${e.message}", e)
@@ -50,12 +113,45 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    fun signInWithEmail(email: String, password: String) {
+    fun signInWithEmail(email: String, password: String, dataStore: DataStore<Preferences>? = null) {
         viewModelScope.launch {
             try {
                 isLoading.value = true
                 errorMessage.value = null
-                auth.signInWithEmailAndPassword(email, password).await()
+                val authResult = auth.signInWithEmailAndPassword(email, password).await()
+                
+                // After successful sign-in, check onboarding status in Firestore
+                val user = authResult.user
+                if (user != null) {
+                    val db = FirebaseFirestore.getInstance()
+                    val userDoc = db.collection("users").document(user.uid).get().await()
+                    
+                    if (userDoc.exists()) {
+                        // Check onboarding status
+                        val onboardingCompleted = userDoc.getBoolean("onboardingCompleted") ?: false
+                        Log.d("AuthViewModel", "User ${user.email} onboardingCompleted: $onboardingCompleted")
+                        
+                        // Update DataStore with Firestore onboarding status
+                        dataStore?.let { store ->
+                            try {
+                                store.edit { preferences ->
+                                    preferences[ONBOARDING_COMPLETED_KEY] = if (onboardingCompleted) "true" else "false"
+                                }
+                                Log.d("AuthViewModel", "Updated DataStore onboarding status to: $onboardingCompleted")
+                            } catch (e: Exception) {
+                                Log.e("AuthViewModel", "Failed to update DataStore: ${e.message}", e)
+                            }
+                        }
+                        
+                        // Set isNewAccount to false if onboarding is completed
+                        isNewAccount.value = !onboardingCompleted
+                    } else {
+                        Log.d("AuthViewModel", "No Firestore document found for email user")
+                        // If no document exists (rare case), treat as new account
+                        isNewAccount.value = true
+                    }
+                }
+                
                 isAuthenticated.value = true
                 currentUser.value = auth.currentUser
                 Log.d("AuthViewModel", "Sign-in successful for ${email}")
@@ -69,13 +165,75 @@ class AuthViewModel : ViewModel() {
     }
 
     // Google Authentication
-    fun handleGoogleSignIn(idToken: String) {
+    fun handleGoogleSignIn(idToken: String, dataStore: DataStore<Preferences>? = null) {
         viewModelScope.launch {
             try {
                 isLoading.value = true
                 errorMessage.value = null
                 val credential = GoogleAuthProvider.getCredential(idToken, null)
-                auth.signInWithCredential(credential).await()
+                val authResult = auth.signInWithCredential(credential).await()
+                
+                // Check if this is a new or existing user
+                val user = authResult.user
+                if (user != null) {
+                    // Check if user document exists in Firestore
+                    val db = FirebaseFirestore.getInstance()
+                    val userDocRef = db.collection("users").document(user.uid)
+                    val userDoc = userDocRef.get().await()
+                    
+                    if (!userDoc.exists()) {
+                        // Document doesn't exist, create one with default values
+                        Log.d("AuthViewModel", "Creating new Firestore document for Google user ${user.email}")
+                        val userData = hashMapOf(
+                            "uid" to user.uid,
+                            "email" to user.email,
+                            "displayName" to user.displayName,
+                            "dietaryRestrictions" to listOf<String>(),
+                            "cuisinePreferences" to listOf<String>(),
+                            "priceRange" to 2,
+                            "onboardingCompleted" to false,
+                            "createdAt" to Timestamp.now(),
+                            "updatedAt" to Timestamp.now()
+                        )
+                        
+                        userDocRef.set(userData).await()
+                        
+                        // Update DataStore with onboarding status (false for new account)
+                        dataStore?.let { store ->
+                            try {
+                                store.edit { preferences ->
+                                    preferences[ONBOARDING_COMPLETED_KEY] = "false"
+                                }
+                                Log.d("AuthViewModel", "Updated DataStore onboarding status to: false")
+                            } catch (e: Exception) {
+                                Log.e("AuthViewModel", "Failed to update DataStore: ${e.message}", e)
+                            }
+                        }
+                        
+                        // Mark as new account to trigger onboarding
+                        isNewAccount.value = true
+                        Log.d("AuthViewModel", "New Google account created and marked for onboarding")
+                    } else {
+                        // Document exists, check onboarding status
+                        val onboardingCompleted = userDoc.getBoolean("onboardingCompleted") ?: false
+                        
+                        // Update DataStore with Firestore onboarding status
+                        dataStore?.let { store ->
+                            try {
+                                store.edit { preferences ->
+                                    preferences[ONBOARDING_COMPLETED_KEY] = if (onboardingCompleted) "true" else "false"
+                                }
+                                Log.d("AuthViewModel", "Updated DataStore onboarding status to: $onboardingCompleted")
+                            } catch (e: Exception) {
+                                Log.e("AuthViewModel", "Failed to update DataStore: ${e.message}", e)
+                            }
+                        }
+                        
+                        isNewAccount.value = !onboardingCompleted
+                        Log.d("AuthViewModel", "Existing Google user found, onboardingCompleted: $onboardingCompleted")
+                    }
+                }
+                
                 isAuthenticated.value = true
                 currentUser.value = auth.currentUser
                 Log.d("AuthViewModel", "Google sign-in successful for ${auth.currentUser?.email}")
@@ -107,11 +265,29 @@ class AuthViewModel : ViewModel() {
     }
 
     // Sign Out
-    fun signOut() {
+    fun signOut(dataStore: DataStore<Preferences>? = null) {
         auth.signOut()
         isAuthenticated.value = false
         currentUser.value = null
         errorMessage.value = null
+        // Reset new account flag on sign out
+        isNewAccount.value = false
+        
+        // Completely clear DataStore preferences if available
+        dataStore?.let { store ->
+            viewModelScope.launch {
+                try {
+                    // Clear all preferences by setting to empty
+                    store.edit { preferences ->
+                        preferences.clear()
+                    }
+                    Log.d("AuthViewModel", "Cleared all preferences in DataStore on sign out")
+                } catch (e: Exception) {
+                    Log.e("AuthViewModel", "Failed to clear DataStore preferences on sign out", e)
+                }
+            }
+        }
+        
         Log.d("AuthViewModel", "User signed out, isAuthenticated: ${isAuthenticated.value}")
     }
 
