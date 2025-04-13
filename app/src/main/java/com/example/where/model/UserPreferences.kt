@@ -1,4 +1,4 @@
-package com.example.where.models
+package com.example.where.model
 
 data class UserPreferences(
     val dietaryRestrictions: List<String> = emptyList(),

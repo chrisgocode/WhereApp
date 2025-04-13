@@ -34,9 +34,10 @@ import com.example.where.R
 import com.example.where.ui.auth.AuthViewModel
 import com.example.where.ui.auth.SignInScreen
 import com.example.where.ui.auth.SignUpScreen
-import com.example.where.ui.onboarding.OnboardingScreen
-import com.example.where.ui.onboarding.OnboardingViewModel
+import com.example.where.ui.screens.onboarding.OnboardingScreen
+import com.example.where.ui.screens.onboarding.OnboardingViewModel
 import com.example.where.ui.theme.WhereTheme
+import com.example.where.ui.screens.home.HomeScreen
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
@@ -154,9 +155,9 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
                 viewModel = onboardingViewModel,
                 onFinish = {
                     onboardingViewModel.completeOnboarding()
-                    // navController.navigate("home") {
-                    //    popUpTo(0) // Clear back stack
-                    // }
+                    navController.navigate("home") {
+                       popUpTo(0) // Clear back stack
+                    }
                 }
             )
         }
@@ -167,26 +168,11 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
                 onSignOut = {
                     authViewModel.signOut()
                     onboardingViewModel.resetOnboarding() // Reset onboarding status
-                    // navController.navigate("sign_in") {
-                    //    popUpTo(0) // Clear back stack
-                    // }
+                    navController.navigate("sign_in") {
+                        popUpTo(0) // Clear back stack
+                    }
                 }
             )
-        }
-    }
-}
-
-@Composable
-fun HomeScreen(onSignOut: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(text = "Welcome to the Home Screen!")
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onSignOut) {
-            Text("Sign Out")
         }
     }
 }

@@ -1,4 +1,4 @@
-package com.example.where.ui.onboarding
+package com.example.where.ui.screens.onboarding
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.where.models.UserPreferences
+import com.example.where.model.UserPreferences
 
 @Composable
 fun OnboardingScreen(
