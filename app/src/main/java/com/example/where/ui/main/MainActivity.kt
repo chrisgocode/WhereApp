@@ -259,7 +259,7 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
         }
         composable("profile") {
             ProfileScreen(
-                viewModel = viewModel(factory = ProfileViewModelFactory(dataStore)),
+                viewModel = viewModel(factory = ProfileViewModelFactory(dataStore, context)),
                 navController = navController,
                 onSignOut = {
                     authViewModel.signOut(dataStore)
@@ -326,12 +326,13 @@ fun MeetupScreen(
 
 // ViewModel Factory for ProfileViewModel with DataStore
 class ProfileViewModelFactory(
-    private val dataStore: DataStore<Preferences>
+    private val dataStore: DataStore<Preferences>,
+    private val context: Context
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ProfileViewModel::class.java)) {
-            return ProfileViewModel(dataStore) as T
+            return ProfileViewModel(dataStore, context) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

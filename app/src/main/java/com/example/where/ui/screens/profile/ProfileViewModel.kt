@@ -1,5 +1,6 @@
 package com.example.where.ui.screens.profile
 
+import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -18,9 +19,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import android.util.Log
 import androidx.datastore.preferences.core.edit
+import com.example.where.controller.RestaurantController
 
 class ProfileViewModel(
-    private val dataStore: DataStore<Preferences>
+    private val dataStore: DataStore<Preferences>,
+    context: Context,
+    private val restaurantController: RestaurantController = RestaurantController(context)
 ) : ViewModel() {
 
     // User information
@@ -40,8 +44,29 @@ class ProfileViewModel(
     }
 
     init {
+        fetchCity()
         loadUserData()
     }
+
+    private fun fetchCity() {
+        viewModelScope.launch {
+            isLoading.value = true
+            errorMessage.value = null
+
+            restaurantController.getUserLocation(
+                onSuccess = { latLng ->
+                    userLocation.value = restaurantController.userCity.value
+                        ?: "Unknown Location"
+                    isLoading.value = false
+                },
+                onError = { error ->
+                    userLocation.value = error
+                    isLoading.value = false
+                }
+            )
+        }
+    }
+
 
     private fun loadUserData() {
         viewModelScope.launch {
@@ -76,7 +101,7 @@ class ProfileViewModel(
 
                     if (documentSnapshot.exists()) {
                         userName.value = documentSnapshot.getString("displayName") ?: "Unknown User"
-                        userLocation.value = documentSnapshot.getString("location") ?: "Unknown Location"
+//                        userLocation.value = restaurantController.userCity.value ?: "Unknown Location"
                         val firestoreDietaryRestrictions = documentSnapshot.get("dietaryRestrictions") as? List<String> ?: emptyList()
                         val firestoreCuisinePreferences = documentSnapshot.get("cuisinePreferences") as? List<String> ?: emptyList()
                         val firestorePriceRange = documentSnapshot.getLong("priceRange")?.toInt() ?: 2

@@ -20,6 +20,9 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.roundToInt
 import android.Manifest
+import android.location.Geocoder
+import java.io.IOException
+import java.util.Locale
 
 class RestaurantController(private val context: Context) {
 
@@ -29,6 +32,10 @@ class RestaurantController(private val context: Context) {
     // User's current location
     private var _userLocation = mutableStateOf<LatLng?>(null)
     val userLocation = _userLocation
+
+    // User's current city
+    private var _userCity = mutableStateOf<String?>(null)
+    val userCity = _userCity
 
     // List of nearby restaurants
     private var _nearbyRestaurants = mutableStateOf<List<Restaurant>>(emptyList())
@@ -85,6 +92,7 @@ class RestaurantController(private val context: Context) {
             
             val location = getLocationSuspend()
             _userLocation.value = location
+            getUserCity(location)
             onSuccess(location)
         } catch (e: SecurityException) {
             Log.e("RestaurantController", "Security exception: ${e.message}")
@@ -109,6 +117,39 @@ class RestaurantController(private val context: Context) {
             val defaultLatLng = LatLng(37.7749, -122.4194)
             _userLocation.value = defaultLatLng
             onSuccess(defaultLatLng)
+        }
+    }
+
+    private suspend fun getUserCity(loc: LatLng) {
+        withContext(Dispatchers.IO) {
+            try {
+                val geocoder = Geocoder(context, Locale.getDefault())
+                val list = geocoder.getFromLocation(
+                    loc.latitude,
+                    loc.longitude,
+                    /* maxResults = */ 1
+                )
+                val cityName = if (list.isNullOrEmpty()) {
+                    "Unknown"
+                } else {
+                    val addr = list[0]
+                    // prefer locality (city), then subAdminArea, then adminArea
+                    addr.locality
+                        ?: addr.subAdminArea
+                        ?: addr.adminArea
+                        ?: "Unknown"
+                }
+                _userCity.value = cityName
+                Log.d("RestaurantController", "Resolved city: $cityName")
+            }
+            catch (ioe: IOException) {
+                Log.e("RestaurantController", "Geocoder I/O exception", ioe)
+                _userCity.value = "Unknown"
+            }
+            catch (e: Exception) {
+                Log.e("RestaurantController", "Unexpected error in geocoding", e)
+                _userCity.value = "Unknown"
+            }
         }
     }
 
