@@ -16,10 +16,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -33,16 +29,21 @@ private val PrimaryPurple = Color(0xFF8A3FFC)
 private val DividerColor = Color(0xFFE0E0E0) // Light gray for the divider
 
 @Composable
-fun BottomNavBar() {
-    var selectedItem by remember { mutableStateOf(0) }
+fun BottomNavBar(
+    selectedRoute: String = "home",
+    onNavItemClick: (String) -> Unit = {}
+) {
+    // Map routes to indices
+    val routes = listOf("home", "groups", "meetup", "profile")
+    val selectedIndex = routes.indexOf(selectedRoute).takeIf { it >= 0 } ?: 0
+
     val items = listOf("Home", "Groups", "Meetup", "Profile")
-    val icons =
-        listOf(
-            Icons.Default.Home,
-            Icons.Default.Person, // Using Person as a placeholder for Groups
-            Icons.Default.LocationOn, // Using LocationOn as a placeholder for Meetup
-            Icons.Default.Person
-        )
+    val icons = listOf(
+        Icons.Default.Home,
+        Icons.Default.Person, // Placeholder for Groups
+        Icons.Default.LocationOn, // Placeholder for Meetup
+        Icons.Default.Person
+    )
 
     Column {
         // Thin divider line above the navigation bar
@@ -61,24 +62,22 @@ fun BottomNavBar() {
                             imageVector = icons[index],
                             contentDescription = item,
                             modifier = Modifier.size(24.dp),
-                            tint = if (selectedItem == index) PrimaryPurple else Color.Gray
+                            tint = if (selectedIndex == index) PrimaryPurple else Color.Gray
                         )
                     },
                     label = {
                         Text(
                             text = item,
                             fontSize = 12.sp,
-                            fontWeight =
-                                if (selectedItem == index) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedItem == index) PrimaryPurple else Color.Gray
+                            fontWeight = if (selectedIndex == index) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedIndex == index) PrimaryPurple else Color.Gray
                         )
                     },
-                    selected = selectedItem == index,
-                    onClick = { selectedItem = index },
-                    colors =
-                        NavigationBarItemDefaults.colors(
-                            indicatorColor = Color.Transparent // Make the indicator invisible
-                        )
+                    selected = selectedIndex == index,
+                    onClick = { onNavItemClick(routes[index]) },
+                    colors = NavigationBarItemDefaults.colors(
+                        indicatorColor = Color.Transparent // Make the indicator invisible
+                    )
                 )
             }
         }
@@ -88,9 +87,9 @@ fun BottomNavBar() {
 @Preview
 @Composable
 fun BottomNavBarPreview() {
-    WhereTheme { 
-        Column { 
-            BottomNavBar() 
-        } 
+    WhereTheme {
+        Column {
+            BottomNavBar()
+        }
     }
-} 
+}
