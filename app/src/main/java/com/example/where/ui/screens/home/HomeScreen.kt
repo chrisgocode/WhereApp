@@ -65,6 +65,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.navigation.NavController
 import com.example.where.ui.theme.WhereTheme
 
 val TAG = "HomeScreen"
@@ -77,7 +78,11 @@ val LightGray = Color(0xFFE0E0E0)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onSignOut: () -> Unit = {}) {
+fun HomeScreen(
+    navController: NavController,
+    onSignOut: () -> Unit = {},
+    onNavItemClick: (String) -> Unit = {}
+) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -87,7 +92,7 @@ fun HomeScreen(onSignOut: () -> Unit = {}) {
     // API key for Google Maps
     val apiKey = BuildConfig.MAPS_API_KEY
 
-    Log.d(TAG, "HomeScreen initialized, API Key length: ${apiKey.length}")
+    //Log.d(TAG, "HomeScreen initialized, API Key length: ${apiKey.length}")
 
     // TabIndex state
     var selectedTabIndex by remember { mutableStateOf(0) }
@@ -133,12 +138,12 @@ fun HomeScreen(onSignOut: () -> Unit = {}) {
     }
 
     Scaffold(
-        bottomBar = { BottomNavBar() },
+        bottomBar = { BottomNavBar(selectedRoute = "home", onNavItemClick = onNavItemClick) },
         content = { innerPadding ->
             Surface(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding), 
+                    .padding(innerPadding),
                 color = BackgroundWhite
             ) {
                 Column(
@@ -180,7 +185,7 @@ fun HomeScreen(onSignOut: () -> Unit = {}) {
                                     .size(24.dp)
                                     .clip(CircleShape)
                                     .background(Color.Gray)
-                                    .clickable { onSignOut() }
+                                    .clickable { navController.navigate("profile") }
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Person,
@@ -205,12 +210,12 @@ fun HomeScreen(onSignOut: () -> Unit = {}) {
                         },
                         shape = RoundedCornerShape(8.dp),
                         colors =
-                            TextFieldDefaults.colors(
-                                focusedIndicatorColor = LightGray,
-                                unfocusedIndicatorColor = LightGray,
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White
-                            ),
+                        TextFieldDefaults.colors(
+                            focusedIndicatorColor = LightGray,
+                            unfocusedIndicatorColor = LightGray,
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White
+                        ),
                         singleLine = true
                     )
 
@@ -232,8 +237,8 @@ fun HomeScreen(onSignOut: () -> Unit = {}) {
                                 text = "List",
                                 color = if (selectedTabIndex == 1) Color.Gray else PrimaryPurple,
                                 fontWeight =
-                                    if (selectedTabIndex == 1) FontWeight.Normal
-                                    else FontWeight.Bold,
+                                if (selectedTabIndex == 1) FontWeight.Normal
+                                else FontWeight.Bold,
                                 modifier = Modifier.clickable { selectedTabIndex = 0 }
                             )
                         }
@@ -256,8 +261,8 @@ fun HomeScreen(onSignOut: () -> Unit = {}) {
                                 text = "Map",
                                 color = if (selectedTabIndex == 0) Color.Gray else PrimaryPurple,
                                 fontWeight =
-                                    if (selectedTabIndex == 0) FontWeight.Normal
-                                    else FontWeight.Bold,
+                                if (selectedTabIndex == 0) FontWeight.Normal
+                                else FontWeight.Bold,
                                 modifier = Modifier.clickable { selectedTabIndex = 1 }
                             )
                         }
@@ -271,14 +276,14 @@ fun HomeScreen(onSignOut: () -> Unit = {}) {
                     ) {
                         Box(
                             modifier =
-                                Modifier
-                                    .fillMaxWidth(0.5f)
-                                    .height(2.dp)
-                                    .align(
-                                        if (selectedTabIndex == 0) Alignment.CenterStart
-                                        else Alignment.CenterEnd
-                                    )
-                                    .background(PrimaryPurple)
+                            Modifier
+                                .fillMaxWidth(0.5f)
+                                .height(2.dp)
+                                .align(
+                                    if (selectedTabIndex == 0) Alignment.CenterStart
+                                    else Alignment.CenterEnd
+                                )
+                                .background(PrimaryPurple)
                         )
                     }
 
@@ -453,16 +458,6 @@ fun HomeScreen(onSignOut: () -> Unit = {}) {
     )
 }
 
-// TODO:
-//  Create a DetailedRestaurantCard for when a user clicks
-//  on a resturant.
-//  Will display more information about restaurant:
-//   - Type
-//   - Hours
-//   - Reviews? Ratings?
-//   - Potential for a match score based on their preferences?
-//   - Etc.
-
 @Composable
 fun RestaurantCard(restaurant: Restaurant) {
     Card(
@@ -476,20 +471,20 @@ fun RestaurantCard(restaurant: Restaurant) {
             // Background color based on category
             Box(
                 modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            // TODO:
-                            //  Replace with restaurant images instead
-                            when (restaurant.category) {
-                                "Cafe" -> Color(0xFFC1B18B)
-                                "Restaurant" -> Color(0xFFA1C6EA)
-                                "Bar" -> Color(0xFF424242)
-                                "Bakery" -> Color(0xFFD7CCC8)
-                                "Takeaway" -> Color(0xFFFFCCBC)
-                                else -> Color.LightGray
-                            }
-                        )
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        // TODO:
+                        //  Replace with restaurant images instead
+                        when (restaurant.category) {
+                            "Cafe" -> Color(0xFFC1B18B)
+                            "Restaurant" -> Color(0xFFA1C6EA)
+                            "Bar" -> Color(0xFF424242)
+                            "Bakery" -> Color(0xFFD7CCC8)
+                            "Takeaway" -> Color(0xFFFFCCBC)
+                            else -> Color.LightGray
+                        }
+                    )
             )
 
             // TODO:
@@ -498,12 +493,12 @@ fun RestaurantCard(restaurant: Restaurant) {
             // Category tag
             Box(
                 modifier =
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White)
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             ) { Text(text = restaurant.category, fontSize = 12.sp, color = Color.Black) }
 
             // TODO:
@@ -511,11 +506,11 @@ fun RestaurantCard(restaurant: Restaurant) {
             // Bottom information overlay
             Column(
                 modifier =
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .background(Color.White)
-                        .padding(12.dp)
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .background(Color.White)
+                    .padding(12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -566,12 +561,12 @@ fun RestaurantCard(restaurant: Restaurant) {
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun HomeScreenPreview() {
-    WhereTheme {
-        Scaffold(bottomBar = { BottomNavBar() }) { paddingValues ->
-            Box(modifier = Modifier.padding(paddingValues)) { HomeScreen() }
-        }
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun HomeScreenPreview() {
+//    WhereTheme {
+//        Scaffold(bottomBar = { BottomNavBar() }) { paddingValues ->
+//            Box(modifier = Modifier.padding(paddingValues)) { HomeScreen(NavController()) }
+//        }
+//    }
+//}

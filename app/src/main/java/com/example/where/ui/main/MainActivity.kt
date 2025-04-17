@@ -7,31 +7,27 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -44,9 +40,15 @@ import com.example.where.ui.screens.onboarding.OnboardingScreen
 import com.example.where.ui.screens.onboarding.OnboardingViewModel
 import com.example.where.ui.theme.WhereTheme
 import com.example.where.ui.screens.home.HomeScreen
+import com.example.where.ui.screens.profile.ProfileScreen
+import com.example.where.ui.screens.profile.ProfileViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.navigation.NavController
+import com.example.where.ui.screens.shared.BottomNavBar
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
@@ -72,7 +74,7 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
     val authViewModel: AuthViewModel = viewModel()
     val onboardingViewModel: OnboardingViewModel = viewModel { OnboardingViewModel(dataStore) }
     val context = LocalContext.current
-    
+
     // Track if initial destination has been determined
     var isInitializing by remember { mutableStateOf(true) }
     var startDestination by remember { mutableStateOf("sign_in") }
@@ -108,68 +110,38 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
         }
     }
 
-    // Check authentication and onboarding status before showing any UI
+    // Check authentication and onboarding status for initial destination
     LaunchedEffect(authViewModel.isAuthenticated.value, onboardingViewModel.onboardingCompleted.value, initializationComplete, authViewModel.isNewAccount.value) {
-        // Check navigation state
-        Log.d("WhereApp", "Nav state: auth=${authViewModel.isAuthenticated.value}, onboarding=${onboardingViewModel.onboardingCompleted.value}, init=$initializationComplete")
-        
         if (initializationComplete) {
-            if (authViewModel.isAuthenticated.value) {
-                if (authViewModel.isNewAccount.value) {
-                    startDestination = "onboarding"
-                    Log.d("WhereApp", "New user -> onboarding")
-                } else if (onboardingViewModel.onboardingCompleted.value) {
-                    startDestination = "home"
-                    Log.d("WhereApp", "Existing user with completed onboarding -> home")
-                } else {
-                    startDestination = "onboarding"
-                    Log.d("WhereApp", "Existing user with incomplete onboarding -> onboarding")
-                }
-            } else {
-                startDestination = "sign_in"
-                Log.d("WhereApp", "Not authenticated -> sign_in")
+            startDestination = when {
+                !authViewModel.isAuthenticated.value -> "sign_in"
+                authViewModel.isNewAccount.value || !onboardingViewModel.onboardingCompleted.value -> "onboarding"
+                else -> "home"
             }
-            
+            Log.d("WhereApp", "Start destination: $startDestination")
             isInitializing = false
         }
     }
 
-    if (isInitializing) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // TODO: Add a loading indicator or splash screen here
-        }
-        return
-    }
-    
-    // Runtime navigation - separate from initialization
+    // Handle runtime navigation changes
     LaunchedEffect(authViewModel.isAuthenticated.value, onboardingViewModel.onboardingCompleted.value, authViewModel.isNewAccount.value) {
-        // Only handle navigation if we have a current destination
-        navController.currentDestination?.let { currentDestination ->
+        navController.currentDestination?.route?.let { currentRoute ->
             if (authViewModel.isAuthenticated.value) {
-                if (authViewModel.isNewAccount.value && currentDestination.route != "onboarding") {
-                    // Newly created account should go to onboarding
+                if (authViewModel.isNewAccount.value && currentRoute != "onboarding") {
                     navController.navigate("onboarding") {
-                        popUpTo(0) // Clear back stack
+                        popUpTo(0)
                     }
-                    // Reset new account flag after navigation
                     authViewModel.isNewAccount.value = false
-                } else if (onboardingViewModel.onboardingCompleted.value && 
-                    currentDestination.route == "onboarding") {
-                    // If onboarding is complete but we're on onboarding screen, go to home
+                } else if (onboardingViewModel.onboardingCompleted.value && currentRoute == "onboarding") {
                     navController.navigate("home") {
                         popUpTo(0)
                     }
-                } else if (!onboardingViewModel.onboardingCompleted.value && 
-                          currentDestination.route != "onboarding" &&
-                          currentDestination.route != "sign_in" && 
-                          currentDestination.route != "sign_up") {
-                    // If onboarding not complete and we're not on onboarding or auth screens, go to onboarding
+                } else if (!onboardingViewModel.onboardingCompleted.value && currentRoute !in listOf("onboarding", "sign_in", "sign_up")) {
                     navController.navigate("onboarding") {
                         popUpTo(0)
                     }
                 }
-            } else if (currentDestination.route !in listOf("sign_in", "sign_up")) {
-                // If not authenticated and not on auth screens, go to sign in
+            } else if (currentRoute !in listOf("sign_in", "sign_up")) {
                 navController.navigate("sign_in") {
                     popUpTo(0)
                 }
@@ -183,6 +155,13 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
             Log.e("AuthError", error)
             // TODO: Show snackbar on error
         }
+    }
+
+    if (isInitializing) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
     }
 
     NavHost(
@@ -216,7 +195,7 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
                 onFinish = {
                     onboardingViewModel.completeOnboarding()
                     navController.navigate("home") {
-                       popUpTo(0) // Clear back stack
+                        popUpTo(0)
                     }
                 }
             )
@@ -225,14 +204,135 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
         // Main app flow (post-authentication)
         composable("home") {
             HomeScreen(
+                navController = navController,
                 onSignOut = {
                     authViewModel.signOut(dataStore)
                     onboardingViewModel.resetOnSignOut()
                     navController.navigate("sign_in") {
-                        popUpTo(0) // Clear back stack
+                        popUpTo(0)
+                    }
+                },
+                onNavItemClick = { route ->
+                    if (route != navController.currentDestination?.route) {
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 }
             )
         }
+        composable("groups") {
+            GroupsScreen(
+                navController = navController,
+                onNavItemClick = { route ->
+                    if (route != navController.currentDestination?.route) {
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                }
+            )
+        }
+        composable("meetup") {
+            MeetupScreen(
+                navController = navController,
+                onNavItemClick = { route ->
+                    if (route != navController.currentDestination?.route) {
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                }
+            )
+        }
+        composable("profile") {
+            ProfileScreen(
+                viewModel = viewModel(factory = ProfileViewModelFactory(dataStore)),
+                navController = navController,
+                onSignOut = {
+                    authViewModel.signOut(dataStore)
+                    onboardingViewModel.resetOnSignOut()
+                    navController.navigate("sign_in") {
+                        popUpTo(0)
+                    }
+                },
+                onNavItemClick = { route ->
+                    if (route != navController.currentDestination?.route) {
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+
+// Placeholder GroupsScreen
+@Composable
+fun GroupsScreen(
+    navController: NavController,
+    onNavItemClick: (String) -> Unit
+) {
+    Scaffold(
+        bottomBar = { BottomNavBar(selectedRoute = "groups", onNavItemClick = onNavItemClick) }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Groups Screen (Placeholder)")
+        }
+    }
+}
+
+// Placeholder MeetupScreen
+@Composable
+fun MeetupScreen(
+    navController: NavController,
+    onNavItemClick: (String) -> Unit
+) {
+    Scaffold(
+        bottomBar = { BottomNavBar(selectedRoute = "meetup", onNavItemClick = onNavItemClick) }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Meetup Screen (Placeholder)")
+        }
+    }
+}
+
+// ViewModel Factory for ProfileViewModel with DataStore
+class ProfileViewModelFactory(
+    private val dataStore: DataStore<Preferences>
+) : ViewModelProvider.Factory {
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(ProfileViewModel::class.java)) {
+            return ProfileViewModel(dataStore) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
