@@ -13,7 +13,10 @@ interface PlacesApiService {
             @Query("type") type: String = "restaurant",
             @Query("key") apiKey: String,
             @Query("pagetoken") pageToken: String? = null,
-            @Query("rankby") rankby: String? = null
+            @Query("rankby") rankby: String? = null,
+            @Query("keyword") keyword: String? = null,
+            @Query("minprice") minprice: Int? = null,
+            @Query("maxprice") maxprice: Int? = null
     ): NearbySearchResponse
 
     @GET("details/json")

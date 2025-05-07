@@ -11,6 +11,7 @@ import com.example.where.model.NearbySearchResponse
 import com.example.where.model.PlaceDetailResult
 import com.example.where.model.Restaurant
 import com.example.where.model.RestaurantApiClient
+import com.example.where.model.UserPreferences
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.LatLng
@@ -211,13 +212,20 @@ constructor(
     // TODO:
     //  Centralize radius variable, maybe a filter for users to change?
     // Fetch nearby restaurants (initial load)
-    suspend fun fetchNearbyRestaurants(radius: Int = 8046) { // 5 mile radius
+    suspend fun fetchNearbyRestaurants(
+            userPreferences: UserPreferences? = null,
+            searchQuery: String? = null,
+            radius: Int = 8046
+    ) { // 5 mile radius
         _isLoading.value = true
         _errorMessage.value = null
         nextPageToken = null
         _nearbyRestaurants.value = emptyList() // Clear existing results for a fresh search
 
-        Log.d("RestaurantController", "Fetching nearby restaurants with radius: $radius")
+        Log.d(
+                "RestaurantController",
+                "Fetching nearby restaurants with radius: $radius, preferences: $userPreferences, searchQuery: '$searchQuery'"
+        )
 
         if (apiKey.isEmpty()) {
             Log.e("RestaurantController", "API key not initialized or empty")
@@ -234,7 +242,7 @@ constructor(
             return
         }
 
-        fetchRestaurantsPage(location, radius)
+        fetchRestaurantsPage(location, radius, userPreferences, searchQuery)
     }
 
     // Fetch more results (pagination)
@@ -275,9 +283,7 @@ constructor(
                                 location = "${location.latitude},${location.longitude}",
                                 apiKey = apiKey,
                                 pageToken = tokenToUse,
-                                rankby = "distance" // Sort by distance instead of the default
-                                // (prominence/popularity)
-                                )
+                        )
 
                 processResponse(response, location)
             }
@@ -294,19 +300,73 @@ constructor(
         }
     }
 
-    private suspend fun fetchRestaurantsPage(location: LatLng, radius: Int) {
+    private suspend fun fetchRestaurantsPage(
+            location: LatLng,
+            radius: Int,
+            userPreferences: UserPreferences? = null,
+            searchQuery: String? = null
+    ) {
         try {
             withContext(Dispatchers.IO) {
                 val locationString = "${location.latitude},${location.longitude}"
-                Log.d("RestaurantController", "Making API request with location: $locationString")
+
+                var minPrice: Int? = null
+                var maxPrice: Int? = null
+                val keywordsCollector = mutableListOf<String>()
+
+                // Prioritize user's direct search query
+                if (!searchQuery.isNullOrBlank()) {
+                    keywordsCollector.add(searchQuery.trim().lowercase())
+                    // If user searches, ignore saved cuisine preferences, but keep dietary.
+                    userPreferences?.dietaryRestrictions?.forEach { restriction ->
+                        keywordsCollector.add(restriction.lowercase())
+                    }
+                } else {
+                    // No direct search query, so use saved preferences (cuisine and dietary)
+                    userPreferences?.let {
+                        it.cuisinePreferences.forEach { cuisine ->
+                            keywordsCollector.add(cuisine.lowercase())
+                        }
+                        it.dietaryRestrictions.forEach { restriction ->
+                            keywordsCollector.add(restriction.lowercase())
+                        }
+                    }
+                }
+
+                // Apply price preferences regardless of search query
+                userPreferences?.let {
+                    when (it.priceRange) {
+                        1 -> maxPrice = 1
+                        2 -> maxPrice = 2
+                        3 -> maxPrice = 3
+                        4 -> minPrice = 4
+                    }
+                }
+
+                val finalKeyword =
+                        if (keywordsCollector.isNotEmpty()) keywordsCollector.joinToString(" ")
+                        else null
+
+                var rankByQuery: String? = "distance"
+                if (finalKeyword != null) {
+                    rankByQuery = null // API default (prominence) when keyword is used
+                }
+
+                Log.d(
+                        "RestaurantController",
+                        "Making API call: loc=$locationString, finalKeyword='$finalKeyword', minPrice=$minPrice, maxPrice=$maxPrice, rankBy=$rankByQuery, radius=$radius (eff radius: ${if (rankByQuery == "distance") null else radius})"
+                )
 
                 val response =
                         RestaurantApiClient.placesApiService.getNearbyRestaurants(
                                 location = locationString,
                                 apiKey = apiKey,
-                                rankby = "distance" // Sort by distance instead of the default
-                                // (prominence/popularity)
-                                )
+                                radius = if (rankByQuery == "distance") null else radius,
+                                keyword = finalKeyword,
+                                minprice = minPrice,
+                                maxprice = maxPrice,
+                                rankby = rankByQuery
+                        )
 
                 processResponse(response, location)
             }
