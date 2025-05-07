@@ -59,10 +59,7 @@ constructor(
                     }
                     .stateIn(
                             scope = viewModelScope,
-                            started =
-                                    SharingStarted.WhileSubscribed(
-                                            5000
-                                    ),
+                            started = SharingStarted.WhileSubscribed(5000),
                             initialValue = UserPreferences() // Provide a default initial value
                     )
 
@@ -216,6 +213,7 @@ constructor(
                     }
         }
         setupAutomaticLocalPagination()
+        _snackbarMessage.value = null
     }
 
     private fun observeRestaurantControllerState() {
@@ -459,5 +457,37 @@ constructor(
     // Function to clear restaurant details and error
     fun clearRestaurantDetails() {
         viewModelScope.launch { restaurantController.fetchRestaurantDetails("") }
+    }
+
+    // Function to clear all restaurant data for the map and list
+    fun clearMapAndRestaurantList() {
+        _nearbyRestaurants.update { emptyList() }
+        _checkedRestaurantIds.update { emptySet() } // Clear any selected items
+        _visibleRestaurantCount.update { 0 } // Reset pagination for the list view
+        Log.d(TAG, "Cleared all restaurant data from ViewModel.")
+    }
+
+    // Function to search based on map area and current preferences
+    fun searchMapArea(center: LatLng, radiusInMeters: Double) {
+        viewModelScope.launch {
+            if (!_hasLocationPermission.value) {
+                Log.d(TAG, "searchMapArea: Location permission not granted.")
+                _restaurantErrorMessage.value = "Location permission required."
+                return@launch
+            }
+
+            val prefs = currentUserPreferences.value
+            // We ignore the text searchQuery for "Search Here"
+            Log.d(
+                    TAG,
+                    "ViewModel: Searching map area. Center: $center, Radius: $radiusInMeters, Preferences: $prefs"
+            )
+
+            restaurantController.fetchNearbyRestaurantsByArea(
+                    location = center,
+                    radius = radiusInMeters.toInt(),
+                    userPreferences = prefs
+            )
+        }
     }
 }

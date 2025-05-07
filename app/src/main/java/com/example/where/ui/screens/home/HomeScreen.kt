@@ -152,18 +152,30 @@ fun HomeScreen(
         }
     }
 
+    // LaunchedEffect to refetch restaurants for the List tab if it's empty and selected
+    LaunchedEffect(selectedTabIndex, hasLocationPermission, nearbyRestaurantsFromVM.isEmpty()) {
+        if (selectedTabIndex == 0 && nearbyRestaurantsFromVM.isEmpty() && hasLocationPermission) {
+            Log.d(
+                TAG, "List tab is active and empty, and permission granted. Fetching restaurants."
+            )
+            viewModel.fetchNearbyRestaurants()
+        }
+    }
+
     Scaffold(snackbarHost = { SnackbarHost(hostState = snackbarHostState) }, bottomBar = {
         BottomNavBar(selectedRoute = "home", onNavItemClick = onNavItemClick)
     }, content = { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             Surface(
                 modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding), color = BackgroundWhite
+                    .fillMaxSize()
+                    .padding(innerPadding), color = BackgroundWhite
             ) {
-                Column(modifier = Modifier
+                Column(
+                    modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp)) {
+                        .padding(16.dp)
+                ) {
                     // Top bar with title and notification icon
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -201,18 +213,18 @@ fun HomeScreen(
                             )
                             Box(
                                 modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(
-                                                CircleShape
+                                    .size(24.dp)
+                                    .clip(
+                                        CircleShape
+                                    )
+                                    .background(
+                                        Color.Gray
+                                    )
+                                    .clickable {
+                                        navController.navigate(
+                                            "profile"
                                         )
-                                        .background(
-                                                Color.Gray
-                                        )
-                                        .clickable {
-                                                navController.navigate(
-                                                        "profile"
-                                                )
-                                        }) {
+                                    }) {
                                 Icon(
                                     imageVector = Icons.Default.Person,
                                     contentDescription = "Profile",
@@ -235,8 +247,7 @@ fun HomeScreen(
                         Text("Search restaurants...")
                     }, leadingIcon = {
                         Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search"
+                            imageVector = Icons.Default.Search, contentDescription = "Search"
                         )
                     }, shape = RoundedCornerShape(8.dp), colors = TextFieldDefaults.colors(
                         focusedIndicatorColor = LightGray,
@@ -255,10 +266,10 @@ fun HomeScreen(
                     ) {
                         Row(
                             modifier = Modifier
-                                    .weight(1f)
-                                    .padding(
-                                            end = 8.dp
-                                    ),
+                                .weight(1f)
+                                .padding(
+                                    end = 8.dp
+                                ),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -270,17 +281,17 @@ fun HomeScreen(
                                 else FontWeight.Bold,
                                 modifier = Modifier.clickable {
                                     viewModel.selectTab(
-                                            0
-                                        )
+                                        0
+                                    )
                                 })
                         }
 
                         Row(
                             modifier = Modifier
-                                    .weight(1f)
-                                    .padding(
-                                            start = 8.dp
-                                    ),
+                                .weight(1f)
+                                .padding(
+                                    start = 8.dp
+                                ),
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -302,28 +313,28 @@ fun HomeScreen(
                                 else FontWeight.Bold,
                                 modifier = Modifier.clickable {
                                     viewModel.selectTab(
-                                            1
-                                        )
+                                        1
+                                    )
                                 })
                         }
                     }
 
                     Box(
                         modifier = Modifier
-                                .fillMaxWidth()
-                                .height(2.dp)
+                            .fillMaxWidth()
+                            .height(2.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                    .fillMaxWidth(0.5f)
-                                    .height(2.dp)
-                                    .align(
-                                            if (selectedTabIndex == 0) Alignment.CenterStart
-                                            else Alignment.CenterEnd
-                                    )
-                                    .background(
-                                            PrimaryPurple
-                                    )
+                                .fillMaxWidth(0.5f)
+                                .height(2.dp)
+                                .align(
+                                    if (selectedTabIndex == 0) Alignment.CenterStart
+                                    else Alignment.CenterEnd
+                                )
+                                .background(
+                                    PrimaryPurple
+                                )
                         )
                     }
 
@@ -333,16 +344,15 @@ fun HomeScreen(
                     if (!hasLocationPermission) {
                         // Request location permission
                         LocationPermissionUtils.RequestLocationPermission(onPermissionGranted = {
-                                viewModel.updateLocationPermission(
-                                        true
-                                    )
-                            }, onPermissionDenied = { /* TODO: Permission Denied */
-                            })
+                            viewModel.updateLocationPermission(
+                                true
+                            )
+                        }, onPermissionDenied = { /* TODO: Permission Denied */
+                        })
 
                         // Show permission request message
                         Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "Location permission required to show restaurants"
@@ -351,8 +361,7 @@ fun HomeScreen(
                     } else if (restaurantIsLoading && nearbyRestaurantsFromVM.isEmpty()) {
                         // Loading indicator
                         Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(
                                 color = PrimaryPurple
@@ -361,12 +370,10 @@ fun HomeScreen(
                     } else if (restaurantErrorMessage != null) {
                         // Error message
                         Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = restaurantErrorMessage ?: "Unknown error",
-                                color = Color.Red
+                                text = restaurantErrorMessage ?: "Unknown error", color = Color.Red
                             )
                         }
                     } else {
@@ -399,16 +406,15 @@ fun HomeScreen(
 
                                 LazyVerticalGrid(
                                     state = gridState, columns = GridCells.Fixed(
-                                            2
-                                        ), horizontalArrangement = Arrangement.spacedBy(
-                                            16.dp
-                                        ), verticalArrangement = Arrangement.spacedBy(
-                                            16.dp
-                                        )
+                                        2
+                                    ), horizontalArrangement = Arrangement.spacedBy(
+                                        16.dp
+                                    ), verticalArrangement = Arrangement.spacedBy(
+                                        16.dp
+                                    )
                                 ) {
                                     items(
-                                        paginatedRestaurants,
-                                        key = {
+                                        paginatedRestaurants, key = {
                                             it.id
                                         }) { restaurant ->
                                         RestaurantCard(
@@ -416,14 +422,13 @@ fun HomeScreen(
                                             isChecked = restaurant.id in checkedRestaurantIds,
                                             onCheckedChange = { isChecked ->
                                                 viewModel.onRestaurantCheckedChange(
-                                                        restaurant.id,
-                                                        isChecked
-                                                    )
+                                                    restaurant.id, isChecked
+                                                )
                                             },
                                             onClick = {
                                                 viewModel.onRestaurantCardClick(
-                                                        restaurant
-                                                    )
+                                                    restaurant
+                                                )
                                             },
                                             apiKey = apiKey
                                         )
@@ -445,28 +450,24 @@ fun HomeScreen(
                                             if (restaurantIsLoadingMore) {
                                                 Box(
                                                     modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .padding(
-                                                                    16.dp
-                                                            ),
-                                                    contentAlignment = Alignment.Center
+                                                        .fillMaxWidth()
+                                                        .padding(
+                                                            16.dp
+                                                        ), contentAlignment = Alignment.Center
                                                 ) {
                                                     CircularProgressIndicator(
                                                         modifier = Modifier.size(
                                                             24.dp
-                                                        ),
-                                                        color = PrimaryPurple,
-                                                        strokeWidth = 2.dp
+                                                        ), color = PrimaryPurple, strokeWidth = 2.dp
                                                     )
                                                 }
                                             } else if (restaurantHasMoreResults) {
                                                 Box(
                                                     modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .padding(
-                                                                    16.dp
-                                                            ),
-                                                    contentAlignment = Alignment.Center
+                                                        .fillMaxWidth()
+                                                        .padding(
+                                                            16.dp
+                                                        ), contentAlignment = Alignment.Center
                                                 ) {
                                                     if (restaurantIsLoadingMore) {
                                                         Log.d(
@@ -475,12 +476,12 @@ fun HomeScreen(
                                                         )
                                                         Box(
                                                             modifier = Modifier
-                                                                    .fillMaxWidth(
-                                                                            0.7f
-                                                                    )
-                                                                    .height(
-                                                                            48.dp
-                                                                    ), // Match
+                                                                .fillMaxWidth(
+                                                                    0.7f
+                                                                )
+                                                                .height(
+                                                                    48.dp
+                                                                ), // Match
                                                             // button
                                                             // height
                                                             contentAlignment = Alignment.Center
@@ -505,17 +506,14 @@ fun HomeScreen(
                                                                     "Load More button clicked - calling ViewModel"
                                                                 )
                                                                 viewModel.fetchMoreRestaurantsFromApi()
-                                                            },
-                                                            colors = ButtonDefaults.buttonColors(
-                                                                    containerColor = PrimaryPurple
-                                                                ),
-                                                            modifier = Modifier.fillMaxWidth(
+                                                            }, colors = ButtonDefaults.buttonColors(
+                                                                containerColor = PrimaryPurple
+                                                            ), modifier = Modifier.fillMaxWidth(
                                                                 0.7f
                                                             )
                                                         ) {
                                                             Text(
-                                                                "Load More",
-                                                                color = Color.White
+                                                                "Load More", color = Color.White
                                                             )
                                                         }
                                                     }
@@ -529,20 +527,28 @@ fun HomeScreen(
                             1 -> {
                                 Box(
                                     modifier = Modifier
-                                            .fillMaxSize()
-                                            .clip(
-                                                    RoundedCornerShape(
-                                                            12.dp
-                                                    )
+                                        .fillMaxSize()
+                                        .clip(
+                                            RoundedCornerShape(
+                                                12.dp
                                             )
+                                        )
                                 ) {
                                     RestaurantMapView(
                                         userLocation = userLocation,
                                         restaurants = nearbyRestaurantsFromVM,
                                         onRestaurantClick = { restaurant ->
                                             viewModel.onRestaurantCardClick(
-                                                    restaurant
-                                                )
+                                                restaurant
+                                            )
+                                        },
+                                        onClearClicked = {
+                                            viewModel.clearMapAndRestaurantList()
+                                        },
+                                        onSearchHereClicked = { center, radius ->
+                                            viewModel.searchMapArea(
+                                                center, radius
+                                            )
                                         })
                                 }
                             }
@@ -555,14 +561,12 @@ fun HomeScreen(
                 Button(
                     onClick = {
                         viewModel.onSendButtonInHomeScreenClicked()
-                    }, modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(
-                                        bottom = 80.dp
-                                )
-                                .fillMaxWidth(
-                                        0.7f
-                                ), colors = ButtonDefaults.buttonColors(
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 80.dp)
+                        .fillMaxWidth(0.7f),
+                    colors = ButtonDefaults.buttonColors(
                         containerColor = PrimaryPurple
                     )
                 ) {
@@ -623,8 +627,8 @@ fun SendModal(
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                .fillMaxWidth()
+                .padding(16.dp),
             shape = RoundedCornerShape(16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
@@ -667,16 +671,16 @@ fun SendModal(
                             expanded = expanded, onExpandedChange = { expanded = !expanded }) {
                             TextField(
                                 modifier = Modifier
-                                        .menuAnchor()
-                                        .fillMaxWidth(),
+                                    .menuAnchor()
+                                    .fillMaxWidth(),
                                 readOnly = true,
                                 value = selectedGroup?.name ?: "Select a group",
                                 onValueChange = {},
                                 label = { Text("Group") },
                                 trailingIcon = {
                                     ExposedDropdownMenuDefaults.TrailingIcon(
-                                            expanded = expanded
-                                        )
+                                        expanded = expanded
+                                    )
                                 },
                                 colors = ExposedDropdownMenuDefaults.textFieldColors(),
                             )
@@ -726,8 +730,8 @@ fun SendModal(
                         onClick = onSend,
                         enabled = selectedGroup != null && !isLoading && !isSending,
                         modifier = Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .fillMaxWidth(0.6f),
+                            .align(Alignment.CenterHorizontally)
+                            .fillMaxWidth(0.6f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = PrimaryPurple
                         )
@@ -761,8 +765,8 @@ fun RestaurantCard(
 ) {
     Card(
         modifier = Modifier
-                .fillMaxWidth()
-                .height(180.dp) // TODO: Expand card height based on screen size
+            .fillMaxWidth()
+            .height(180.dp) // TODO: Expand card height based on screen size
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -790,30 +794,30 @@ fun RestaurantCard(
                         fontSize = 8.sp,
                         color = Color.White.copy(alpha = 0.7f),
                         modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .background(
-                                        Color.Black.copy(
-                                                alpha = 0.5f
-                                        )
+                            .align(Alignment.BottomStart)
+                            .background(
+                                Color.Black.copy(
+                                    alpha = 0.5f
                                 )
-                                .padding(2.dp)
+                            )
+                            .padding(2.dp)
                     )
                 }
             } else {
                 // Fallback to category color if no image
                 Box(
                     modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                    when (restaurant.category) {
-                                            "Cafe" -> Color(0xFFC1B18B)
-                                            "Restaurant" -> Color(0xFFA1C6EA)
-                                            "Bar" -> Color(0xFF424242)
-                                            "Bakery" -> Color(0xFFD7CCC8)
-                                            "Takeaway" -> Color(0xFFFFCCBC)
-                                            else -> Color.LightGray
-                                    }
-                            )
+                        .fillMaxSize()
+                        .background(
+                            when (restaurant.category) {
+                                "Cafe" -> Color(0xFFC1B18B)
+                                "Restaurant" -> Color(0xFFA1C6EA)
+                                "Bar" -> Color(0xFF424242)
+                                "Bakery" -> Color(0xFFD7CCC8)
+                                "Takeaway" -> Color(0xFFFFCCBC)
+                                else -> Color.LightGray
+                            }
+                        )
                 )
             }
 
@@ -822,8 +826,8 @@ fun RestaurantCard(
                 checked = isChecked,
                 onCheckedChange = onCheckedChange,
                 modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(4.dp)
+                    .align(Alignment.TopStart)
+                    .padding(4.dp)
             )
 
             // TODO:
@@ -832,11 +836,11 @@ fun RestaurantCard(
             // Category tag
             Box(
                 modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White)
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
                     text = restaurant.category, fontSize = 12.sp, color = Color.Black
@@ -848,10 +852,10 @@ fun RestaurantCard(
             // Bottom information overlay
             Column(
                 modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .background(Color.White)
-                        .padding(12.dp)
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .background(Color.White)
+                    .padding(12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -922,9 +926,9 @@ fun RestaurantDetailModal(
     ) {
         Card(
             modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .heightIn(min = 400.dp, max = 700.dp)
-                    .padding(16.dp),
+                .fillMaxWidth(0.9f)
+                .heightIn(min = 400.dp, max = 700.dp)
+                .padding(16.dp),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -933,10 +937,10 @@ fun RestaurantDetailModal(
                 // Top Bar
                 Row(
                     modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                    start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp
-                            ),
+                        .fillMaxWidth()
+                        .padding(
+                            start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp
+                        ),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -963,9 +967,9 @@ fun RestaurantDetailModal(
 
                 Box(
                     modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                            .background(LightGray)
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .background(LightGray)
                 ) {
                     if (photoReference != null) {
                         val imageUrl =
@@ -984,24 +988,24 @@ fun RestaurantDetailModal(
                                 text = attributionText, fontSize = 8.sp, color = Color.White.copy(
                                     alpha = 0.8f
                                 ), modifier = Modifier
-                                            .align(
-                                                    Alignment.BottomStart
-                                            )
-                                            .background(
-                                                    Color.Black.copy(
-                                                            alpha = 0.6f
-                                                    )
-                                            )
-                                            .padding(
-                                                    horizontal = 4.dp, vertical = 2.dp
-                                            )
+                                    .align(
+                                        Alignment.BottomStart
+                                    )
+                                    .background(
+                                        Color.Black.copy(
+                                            alpha = 0.6f
+                                        )
+                                    )
+                                    .padding(
+                                        horizontal = 4.dp, vertical = 2.dp
+                                    )
                             )
                         }
                     } else {
                         Box(
                             modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Gray),
+                                .fillMaxSize()
+                                .background(Color.Gray),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -1015,15 +1019,15 @@ fun RestaurantDetailModal(
                 if (isLoading) {
                     Box(
                         modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
+                            .fillMaxSize()
+                            .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) { CircularProgressIndicator(color = PrimaryPurple) }
                 } else if (errorMessage != null) {
                     Box(
                         modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
+                            .fillMaxSize()
+                            .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -1033,12 +1037,12 @@ fun RestaurantDetailModal(
                 } else if (restaurantDetails != null) {
                     Column(
                         modifier = Modifier
-                                .padding(
-                                        horizontal = 16.dp, vertical = 12.dp
-                                )
-                                .verticalScroll(
-                                        rememberScrollState()
-                                )
+                            .padding(
+                                horizontal = 16.dp, vertical = 12.dp
+                            )
+                            .verticalScroll(
+                                rememberScrollState()
+                            )
                     ) {
                         // Rating and Reviews
                         Row(
@@ -1166,8 +1170,8 @@ fun RestaurantDetailModal(
                     // error
                     Box(
                         modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
+                            .fillMaxSize()
+                            .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -1194,9 +1198,7 @@ fun DetailItem(
                 "address" -> {
                     val gmmIntentUri = "geo:0,0?q=${Uri.encode(text)}".toUri()
                     val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
-                    mapIntent.setPackage(
-                        "com.google.android.apps.maps"
-                    )
+                    mapIntent.setPackage("com.google.android.apps.maps")
                     if (mapIntent.resolveActivity(
                             context.packageManager
                         ) != null

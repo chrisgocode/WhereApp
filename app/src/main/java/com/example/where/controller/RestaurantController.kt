@@ -16,13 +16,6 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.LatLng
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.IOException
-import java.util.Locale
-import javax.inject.Inject
-import javax.inject.Named
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,12 +23,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import java.io.IOException
+import java.util.Locale
+import javax.inject.Inject
+import javax.inject.Named
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.math.roundToInt
 
 class RestaurantController
-@Inject
-constructor(
-        @ApplicationContext private val context: Context,
-        @Named("mapsApiKey") private val apiKey: String
+@Inject constructor(
+    @ApplicationContext private val context: Context,
+    @Named("mapsApiKey") private val apiKey: String
 ) {
 
     // User's current location
@@ -81,18 +80,15 @@ constructor(
 
     // Location client
     private val fusedLocationClient: FusedLocationProviderClient =
-            LocationServices.getFusedLocationProviderClient(context)
+        LocationServices.getFusedLocationProviderClient(context)
 
     // Check if we have location permissions
     private fun hasLocationPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     // Get user's current location
@@ -113,8 +109,8 @@ constructor(
 
             // use a default location on permission error
             Log.d(
-                    "RestaurantController",
-                    "Permission not granted, using default location for emulator testing"
+                "RestaurantController",
+                "Permission not granted, using default location for emulator testing"
             )
             val defaultLatLng = LatLng(37.7749, -122.4194)
             _userLocation.value = defaultLatLng
@@ -124,8 +120,8 @@ constructor(
 
             // use a default location on failure
             Log.d(
-                    "RestaurantController",
-                    "Error occurred, using default location for emulator testing"
+                "RestaurantController",
+                "Error occurred, using default location for emulator testing"
             )
             val defaultLatLng = LatLng(37.7749, -122.4194)
             _userLocation.value = defaultLatLng
@@ -138,15 +134,14 @@ constructor(
             try {
                 val geocoder = Geocoder(context, Locale.getDefault())
                 val list =
-                        geocoder.getFromLocation(loc.latitude, loc.longitude, /* maxResults = */ 1)
-                val cityName =
-                        if (list.isNullOrEmpty()) {
-                            "Unknown"
-                        } else {
-                            val addr = list[0]
-                            // prefer locality (city), then subAdminArea, then adminArea
-                            addr.locality ?: addr.subAdminArea ?: addr.adminArea ?: "Unknown"
-                        }
+                    geocoder.getFromLocation(loc.latitude, loc.longitude, /* maxResults = */ 1)
+                val cityName = if (list.isNullOrEmpty()) {
+                    "Unknown"
+                } else {
+                    val addr = list[0]
+                    // prefer locality (city), then subAdminArea, then adminArea
+                    addr.locality ?: addr.subAdminArea ?: addr.adminArea ?: "Unknown"
+                }
                 _userCity.value = cityName
                 Log.d("RestaurantController", "Resolved city: $cityName")
             } catch (ioe: IOException) {
@@ -165,40 +160,38 @@ constructor(
             // Double-check permission before accessing location
             if (!hasLocationPermission()) {
                 continuation.resumeWithException(
-                        SecurityException("Location permission not granted")
+                    SecurityException("Location permission not granted")
                 )
                 return@suspendCancellableCoroutine
             }
 
-            fusedLocationClient.lastLocation
-                    .addOnSuccessListener { location: Location? ->
-                        if (location != null) {
-                            val latLng = LatLng(location.latitude, location.longitude)
-                            Log.d("RestaurantController", "Location found: $latLng")
-                            continuation.resume(latLng)
-                        } else {
-                            // if no location available, use a default
-                            // location
-                            Log.d(
-                                    "RestaurantController",
-                                    "No location available, using default for emulator testing"
-                            )
-                            // San Francisco coordinates
-                            val defaultLatLng = LatLng(37.7749, -122.4194)
-                            continuation.resume(defaultLatLng)
-                        }
-                    }
-                    .addOnFailureListener { exception ->
-                        Log.e("RestaurantController", "Location failure: ${exception.message}")
-
-                        // use a default location on failure
+            fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
+                    if (location != null) {
+                        val latLng = LatLng(location.latitude, location.longitude)
+                        Log.d("RestaurantController", "Location found: $latLng")
+                        continuation.resume(latLng)
+                    } else {
+                        // if no location available, use a default
+                        // location
                         Log.d(
-                                "RestaurantController",
-                                "Location failure, using default for emulator testing"
+                            "RestaurantController",
+                            "No location available, using default for emulator testing"
                         )
+                        // San Francisco coordinates
                         val defaultLatLng = LatLng(37.7749, -122.4194)
                         continuation.resume(defaultLatLng)
                     }
+                }.addOnFailureListener { exception ->
+                    Log.e("RestaurantController", "Location failure: ${exception.message}")
+
+                    // use a default location on failure
+                    Log.d(
+                        "RestaurantController",
+                        "Location failure, using default for emulator testing"
+                    )
+                    val defaultLatLng = LatLng(37.7749, -122.4194)
+                    continuation.resume(defaultLatLng)
+                }
 
             // cancellation handler
             continuation.invokeOnCancellation {
@@ -209,22 +202,18 @@ constructor(
         }
     }
 
-    // TODO:
-    //  Centralize radius variable, maybe a filter for users to change?
     // Fetch nearby restaurants (initial load)
     suspend fun fetchNearbyRestaurants(
-            userPreferences: UserPreferences? = null,
-            searchQuery: String? = null,
-            radius: Int = 8046
-    ) { // 5 mile radius
+        userPreferences: UserPreferences? = null, searchQuery: String? = null, radius: Int = 8046
+    ) {
         _isLoading.value = true
         _errorMessage.value = null
         nextPageToken = null
         _nearbyRestaurants.value = emptyList() // Clear existing results for a fresh search
 
         Log.d(
-                "RestaurantController",
-                "Fetching nearby restaurants with radius: $radius, preferences: $userPreferences, searchQuery: '$searchQuery'"
+            "RestaurantController",
+            "Fetching nearby restaurants with radius: $radius, preferences: $userPreferences, searchQuery: '$searchQuery'"
         )
 
         if (apiKey.isEmpty()) {
@@ -234,23 +223,58 @@ constructor(
             return
         }
 
-        val location = _userLocation.value
-        if (location == null) {
-            Log.e("RestaurantController", "User location is null")
+        // Use the stored user location for this function
+        val locationToSearch = _userLocation.value
+
+        if (locationToSearch == null) {
+            Log.e("RestaurantController", "Location to search is null")
             _errorMessage.value = "Location not available"
             _isLoading.value = false
             return
         }
 
-        fetchRestaurantsPage(location, radius, userPreferences, searchQuery)
+        // Pass the determined location and the explicit rankBy logic to the page fetcher
+        fetchRestaurantsPage(
+            locationToSearch,
+            radius,
+            userPreferences,
+            searchQuery,
+            explicitLocationProvided = false // This is key for original behavior
+        )
+    }
+
+    // function for searching a map area without a text query
+    suspend fun fetchNearbyRestaurantsByArea(
+        location: LatLng, radius: Int, userPreferences: UserPreferences?
+    ) {
+        _isLoading.value = true
+        _errorMessage.value = null
+        nextPageToken = null
+        _nearbyRestaurants.value = emptyList()
+
+        Log.d(
+            "RestaurantController",
+            "Fetching nearby restaurants by AREA: location=$location, radius=$radius, preferences: $userPreferences"
+        )
+
+        if (apiKey.isEmpty()) {
+            Log.e("RestaurantController", "API key not initialized or empty")
+            _errorMessage.value = "Maps API key not configured"
+            _isLoading.value = false
+            return
+        }
+
+        fetchRestaurantsPage(
+            location, radius, userPreferences, searchQuery = null, explicitLocationProvided = true
+        )
     }
 
     // Fetch more results (pagination)
     suspend fun fetchMoreRestaurants() {
         if (!hasMoreResults.value || _isLoadingMore.value || nextPageToken == null) {
             Log.d(
-                    "RestaurantController",
-                    "Cannot fetch more: hasMoreResults=${hasMoreResults.value}, isLoadingMore=${_isLoadingMore.value}, hasToken=${nextPageToken != null}"
+                "RestaurantController",
+                "Cannot fetch more: hasMoreResults=${hasMoreResults.value}, isLoadingMore=${_isLoadingMore.value}, hasToken=${nextPageToken != null}"
             )
             return // No more results or already loading
         }
@@ -274,16 +298,15 @@ constructor(
         try {
             withContext(Dispatchers.IO) {
                 Log.d(
-                        "RestaurantController",
-                        "Fetching next page with token: ${tokenToUse?.take(10)}..."
+                    "RestaurantController",
+                    "Fetching next page with token: ${tokenToUse?.take(10)}..."
                 )
 
-                val response =
-                        RestaurantApiClient.placesApiService.getNearbyRestaurants(
-                                location = "${location.latitude},${location.longitude}",
-                                apiKey = apiKey,
-                                pageToken = tokenToUse,
-                        )
+                val response = RestaurantApiClient.placesApiService.getNearbyRestaurants(
+                    location = "${location.latitude},${location.longitude}",
+                    apiKey = apiKey,
+                    pageToken = tokenToUse,
+                )
 
                 processResponse(response, location)
             }
@@ -301,10 +324,11 @@ constructor(
     }
 
     private suspend fun fetchRestaurantsPage(
-            location: LatLng,
-            radius: Int,
-            userPreferences: UserPreferences? = null,
-            searchQuery: String? = null
+        location: LatLng,
+        radius: Int,
+        userPreferences: UserPreferences? = null,
+        searchQuery: String? = null,
+        explicitLocationProvided: Boolean = false
     ) {
         try {
             withContext(Dispatchers.IO) {
@@ -344,29 +368,30 @@ constructor(
                 }
 
                 val finalKeyword =
-                        if (keywordsCollector.isNotEmpty()) keywordsCollector.joinToString(" ")
-                        else null
+                    if (keywordsCollector.isNotEmpty()) keywordsCollector.joinToString(" ")
+                    else null
 
                 var rankByQuery: String? = "distance"
-                if (finalKeyword != null) {
-                    rankByQuery = null // API default (prominence) when keyword is used
+
+                if (finalKeyword != null || explicitLocationProvided) {
+                    rankByQuery =
+                        null
                 }
 
                 Log.d(
-                        "RestaurantController",
-                        "Making API call: loc=$locationString, finalKeyword='$finalKeyword', minPrice=$minPrice, maxPrice=$maxPrice, rankBy=$rankByQuery, radius=$radius (eff radius: ${if (rankByQuery == "distance") null else radius})"
+                    "RestaurantController",
+                    "Making API call: loc=$locationString, finalKeyword='$finalKeyword', minPrice=$minPrice, maxPrice=$maxPrice, rankBy=$rankByQuery, radius=$radius (eff radius: ${if (rankByQuery == "distance") null else radius})"
                 )
 
-                val response =
-                        RestaurantApiClient.placesApiService.getNearbyRestaurants(
-                                location = locationString,
-                                apiKey = apiKey,
-                                radius = if (rankByQuery == "distance") null else radius,
-                                keyword = finalKeyword,
-                                minprice = minPrice,
-                                maxprice = maxPrice,
-                                rankby = rankByQuery
-                        )
+                val response = RestaurantApiClient.placesApiService.getNearbyRestaurants(
+                    location = locationString,
+                    apiKey = apiKey,
+                    radius = if (rankByQuery == "distance") null else radius,
+                    keyword = finalKeyword,
+                    minprice = minPrice,
+                    maxprice = maxPrice,
+                    rankby = rankByQuery
+                )
 
                 processResponse(response, location)
             }
@@ -380,8 +405,8 @@ constructor(
     private fun processResponse(response: NearbySearchResponse, location: LatLng) {
         if (response.status == "OK") {
             Log.d(
-                    "RestaurantController",
-                    "API response successful: ${response.results.size} restaurants found"
+                "RestaurantController",
+                "API response successful: ${response.results.size} restaurants found"
             )
 
             // Save next page token if available
@@ -391,8 +416,8 @@ constructor(
             // Skip processing if no new results
             if (response.results.isEmpty()) {
                 Log.d(
-                        "RestaurantController",
-                        "No new restaurants in response, setting hasMoreResults=false"
+                    "RestaurantController",
+                    "No new restaurants in response, setting hasMoreResults=false"
                 )
                 nextPageToken = null
                 _hasMoreResults.value = false
@@ -401,66 +426,61 @@ constructor(
             }
 
             // Convert API results to Restaurant objects
-            val newRestaurants =
-                    response.results.map { place ->
-                        val placeLocation =
-                                LatLng(place.geometry.location.lat, place.geometry.location.lng)
+            val newRestaurants = response.results.map { place ->
+                val placeLocation = LatLng(place.geometry.location.lat, place.geometry.location.lng)
 
-                        // Calculate distance from user
-                        val distanceInMeters =
-                                calculateDistance(
-                                        location.latitude,
-                                        location.longitude,
-                                        placeLocation.latitude,
-                                        placeLocation.longitude
-                                )
+                // Determine the location to calculate distance from
+                val locationForDistanceCalc = _userLocation.value ?: location
 
-                        // Format distance string (convert meters to miles)
-                        val distanceInMiles = (distanceInMeters / 1609.34)
-                        val formattedDistance =
-                                if (distanceInMiles < 0.1) {
-                                    "< 0.1 miles away"
-                                } else {
-                                    "${(distanceInMiles * 10).roundToInt() / 10.0} miles away"
-                                }
+                // Calculate distance from user's actual location (or fallback)
+                val distanceInMeters = calculateDistance(
+                    locationForDistanceCalc.latitude,
+                    locationForDistanceCalc.longitude,
+                    placeLocation.latitude,
+                    placeLocation.longitude
+                )
 
-                        // Determine category from types
-                        val category =
-                                when {
-                                    place.types.contains("cafe") -> "Cafe"
-                                    place.types.contains("bar") -> "Bar"
-                                    place.types.contains("restaurant") -> "Restaurant"
-                                    place.types.contains("bakery") -> "Bakery"
-                                    place.types.contains("meal_takeaway") -> "Takeaway"
-                                    else -> "Restaurant"
-                                }
+                // Format distance string (convert meters to miles)
+                val distanceInMiles = (distanceInMeters / 1609.34)
+                val formattedDistance = if (distanceInMiles < 0.1) {
+                    "< 0.1 miles away"
+                } else {
+                    "${(distanceInMiles * 10).roundToInt() / 10.0} miles away"
+                }
 
-                        val photoMetadataList =
-                                place.photos?.map {
-                                    com.example.where.model.PhotoMetadata(
-                                            reference = it.photo_reference,
-                                            attributions = it.html_attributions
-                                    )
-                                }
+                // Determine category from types
+                val category = when {
+                    place.types.contains("cafe") -> "Cafe"
+                    place.types.contains("bar") -> "Bar"
+                    place.types.contains("restaurant") -> "Restaurant"
+                    place.types.contains("bakery") -> "Bakery"
+                    else -> "Restaurant"
+                }
 
-                        Restaurant(
-                                id = place.place_id,
-                                name = place.name,
-                                location = placeLocation,
-                                address = place.vicinity,
-                                rating = place.rating ?: 0f,
-                                priceLevel = place.price_level ?: 0,
-                                category = category,
-                                distance = formattedDistance,
-                                distanceInMeters = distanceInMeters,
-                                photoMetadataList = photoMetadataList
-                        )
-                    }
+                val photoMetadataList = place.photos?.map {
+                    com.example.where.model.PhotoMetadata(
+                        reference = it.photo_reference, attributions = it.html_attributions
+                    )
+                }
+
+                Restaurant(
+                    id = place.place_id,
+                    name = place.name,
+                    location = placeLocation,
+                    address = place.vicinity,
+                    rating = place.rating ?: 0f,
+                    priceLevel = place.price_level ?: 0,
+                    category = category,
+                    distance = formattedDistance,
+                    distanceInMeters = distanceInMeters,
+                    photoMetadataList = photoMetadataList
+                )
+            }
 
             // Add new restaurants to existing list and sort by distance
             val allRestaurants = _nearbyRestaurants.value + newRestaurants
             val sortedRestaurants =
-                    allRestaurants.distinctBy { it.id }.sortedBy { it.distanceInMeters }
+                allRestaurants.distinctBy { it.id }.sortedBy { it.distanceInMeters }
             Log.d("RestaurantController", "Processed ${sortedRestaurants.size} total restaurants")
 
             _nearbyRestaurants.value = sortedRestaurants
@@ -471,11 +491,10 @@ constructor(
             nextPageToken = null
         }
 
-        // Always reset loading states after processing response
         resetLoadingState()
         Log.d(
-                "RestaurantController",
-                "End of processResponse: isLoading=false, isLoadingMore=false, hasMoreResults=${_hasMoreResults.value}"
+            "RestaurantController",
+            "End of processResponse: isLoading=false, isLoadingMore=false, hasMoreResults=${_hasMoreResults.value}"
         )
     }
 
@@ -491,14 +510,13 @@ constructor(
         Log.d("RestaurantController", "Explicitly resetting loading states")
         _isLoading.value = false
         _isLoadingMore.value = false
-        // Reset details loading states as well if needed, or handle separately
     }
 
     // Fetch details for a specific restaurant
     suspend fun fetchRestaurantDetails(placeId: String) {
         _detailsLoading.value = true
         _detailsErrorMessage.value = null
-        _restaurantDetails.value = null // Clear previous details
+        _restaurantDetails.value = null
         Log.d("RestaurantController", "Fetching details for placeId: $placeId")
 
         if (apiKey.isEmpty()) {
@@ -509,31 +527,27 @@ constructor(
         }
 
         val fieldsToFetch =
-                "name,formatted_address,international_phone_number,website,opening_hours,rating,user_ratings_total,price_level,photo,geometry,place_id,vicinity,types"
+            "name,formatted_address,international_phone_number,website,opening_hours,rating,user_ratings_total,price_level,photo,geometry,place_id,vicinity,types"
 
         try {
-            val response =
-                    withContext(Dispatchers.IO) {
-                        RestaurantApiClient.placesApiService.getRestaurantDetails(
-                                placeId = placeId,
-                                fields = fieldsToFetch,
-                                apiKey = apiKey
-                        )
-                    }
+            val response = withContext(Dispatchers.IO) {
+                RestaurantApiClient.placesApiService.getRestaurantDetails(
+                    placeId = placeId, fields = fieldsToFetch, apiKey = apiKey
+                )
+            }
 
             if (response.status == "OK" && response.result != null) {
                 _restaurantDetails.value = response.result
                 Log.d(
-                        "RestaurantController",
-                        "Successfully fetched details: ${response.result.name}"
+                    "RestaurantController", "Successfully fetched details: ${response.result.name}"
                 )
             } else {
                 Log.e(
-                        "RestaurantController",
-                        "Error fetching details: ${response.status} - ${response.errorMessage}"
+                    "RestaurantController",
+                    "Error fetching details: ${response.status} - ${response.errorMessage}"
                 )
                 _detailsErrorMessage.value =
-                        response.errorMessage ?: "Error fetching details: ${response.status}"
+                    response.errorMessage ?: "Error fetching details: ${response.status}"
             }
         } catch (e: Exception) {
             Log.e("RestaurantController", "Exception fetching details: ${e.message}", e)
