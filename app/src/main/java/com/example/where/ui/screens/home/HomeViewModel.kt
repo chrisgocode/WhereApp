@@ -137,24 +137,13 @@ constructor(
     val selectedGroupFilters: StateFlow<Set<String>> = _selectedGroupFilters.asStateFlow()
 
     // States for fetched restaurant details from Controller
-    val restaurantDetails: StateFlow<PlaceDetailResult?> =
-            restaurantController.restaurantDetails.stateIn(
-                    viewModelScope,
-                    SharingStarted.WhileSubscribed(5000),
-                    null
-            )
-    val detailsLoading: StateFlow<Boolean> =
-            restaurantController.detailsLoading.stateIn(
-                    viewModelScope,
-                    SharingStarted.WhileSubscribed(5000),
-                    false
-            )
-    val detailsErrorMessage: StateFlow<String?> =
-            restaurantController.detailsErrorMessage.stateIn(
-                    viewModelScope,
-                    SharingStarted.WhileSubscribed(5000),
-                    null
-            )
+    val restaurantDetailsMap: StateFlow<Map<String, PlaceDetailResult?>> = restaurantController.restaurantDetailsMap
+    val detailsLoadingMap: StateFlow<Map<String, Boolean>> = restaurantController.detailsLoadingMap
+    val detailsErrorMap: StateFlow<Map<String, String?>> = restaurantController.detailsErrorMap
+
+    fun getRestaurantDetails(restaurantId: String): PlaceDetailResult? = restaurantDetailsMap.value[restaurantId]
+    fun isDetailsLoading(restaurantId: String): Boolean = detailsLoadingMap.value[restaurantId] ?: false
+    fun getDetailsError(restaurantId: String): String? = detailsErrorMap.value[restaurantId]
 
     private val _visibleRestaurantCount = MutableStateFlow(20) // Initial count from HomeScreen
 

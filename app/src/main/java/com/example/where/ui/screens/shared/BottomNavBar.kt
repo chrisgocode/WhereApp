@@ -34,14 +34,13 @@ fun BottomNavBar(
     onNavItemClick: (String) -> Unit = {}
 ) {
     // Map routes to indices
-    val routes = listOf("home", "groups", "meetup", "profile")
+    val routes = listOf("home", "groups", "profile")
     val selectedIndex = routes.indexOf(selectedRoute).takeIf { it >= 0 } ?: 0
 
-    val items = listOf("Home", "Groups", "Meetup", "Profile")
+    val items = listOf("Home", "Groups", "Profile")
     val icons = listOf(
         Icons.Default.Home,
-        Icons.Default.Person, // Placeholder for Groups
-        Icons.Default.LocationOn, // Placeholder for Meetup
+        Icons.Default.Person,
         Icons.Default.Person
     )
 
