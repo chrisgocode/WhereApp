@@ -11,6 +11,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.example.where.BuildConfig
 import com.example.where.controller.RestaurantController
 import com.example.where.model.Poll
 import com.example.where.model.RestaurantOption
@@ -52,10 +53,15 @@ fun PollItem(poll: Poll, restaurantController: RestaurantController, onVote: (St
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Use the new per-restaurantId maps
+            val restaurantDetailsMap by restaurantController.restaurantDetailsMap.collectAsState()
+            val detailsLoadingMap by restaurantController.detailsLoadingMap.collectAsState()
+            val detailsErrorMap by restaurantController.detailsErrorMap.collectAsState()
+
             poll.restaurants.forEach { restaurant ->
-                val restaurantDetails by restaurantController.restaurantDetails.collectAsState()
-                val detailsLoading by restaurantController.detailsLoading.collectAsState()
-                val detailsError by restaurantController.detailsErrorMessage.collectAsState()
+                val details = restaurantDetailsMap[restaurant.restaurantId]
+                val detailsLoading = detailsLoadingMap[restaurant.restaurantId] ?: false
+                val detailsError = detailsErrorMap[restaurant.restaurantId]
 
                 LaunchedEffect(restaurant.restaurantId) {
                     restaurantController.fetchRestaurantDetails(restaurant.restaurantId)
@@ -72,17 +78,18 @@ fun PollItem(poll: Poll, restaurantController: RestaurantController, onVote: (St
                             modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
                 } else {
-                    val details = restaurantDetails
                     if (details != null && details.placeId == restaurant.restaurantId) {
+                        // Get photo reference if available
+                        val photoReference = details.photos?.firstOrNull()?.photoReference
                         RestaurantOptionItem(
                                 restaurant = restaurant,
-                                restaurantDetails =
-                                        mapOf(
-                                                "name" to (details.name ?: "Unknown"),
-                                                "vicinity" to (details.vicinity ?: ""),
-                                                "rating" to (details.rating ?: 0.0),
-                                                "price_level" to (details.priceLevel ?: 0)
-                                        ),
+                                restaurantDetails = mapOf(
+                                        "name" to (details.name ?: "Unknown"),
+                                        "vicinity" to (details.vicinity ?: ""),
+                                        "rating" to (details.rating ?: 0.0),
+                                        "price_level" to (details.priceLevel ?: 0)
+                                ),
+                                photoReference = photoReference,
                                 isVoted = currentUser in restaurant.votedUsers,
                                 onVote = { onVote(restaurant.restaurantId) },
                                 isPollEnded = poll.isEnded
@@ -99,6 +106,7 @@ fun PollItem(poll: Poll, restaurantController: RestaurantController, onVote: (St
 fun RestaurantOptionItem(
         restaurant: RestaurantOption,
         restaurantDetails: Map<String, Any>,
+        photoReference: String?,
         isVoted: Boolean,
         onVote: () -> Unit,
         isPollEnded: Boolean
@@ -117,9 +125,14 @@ fun RestaurantOptionItem(
                 modifier = Modifier.fillMaxWidth().padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
         ) {
+            val imageUrl = if (photoReference != null) {
+                "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=$photoReference&key=${BuildConfig.MAPS_API_KEY}"
+            } else {
+                "https://via.placeholder.com/60"
+            }
             AsyncImage(
-                    model = "https://via.placeholder.com/60",
-                    contentDescription = "Placeholder image",
+                    model = imageUrl,
+                    contentDescription = restaurantDetails["name"] as? String ?: "Restaurant image",
                     modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Crop
             )
@@ -139,13 +152,11 @@ fun RestaurantOptionItem(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                            text =
-                                    "${(restaurantDetails["rating"] as? Number)?.toDouble() ?: 0.0}★",
+                            text = "${((restaurantDetails["rating"] as? Number)?.toDouble() ?: 0.0).let { String.format("%.1f", it) }}★",
                             style = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                            text =
-                                    " • ${"\$".repeat((restaurantDetails["price_level"] as? Number)?.toInt() ?: 0)}",
+                            text = " • ${"$".repeat((restaurantDetails["price_level"] as? Number)?.toInt() ?: 0)}",
                             style = MaterialTheme.typography.bodySmall
                     )
                 }

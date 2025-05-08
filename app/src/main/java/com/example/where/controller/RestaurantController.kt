@@ -70,15 +70,15 @@ constructor(
     private val _hasMoreResults = MutableStateFlow(false)
     val hasMoreResults: StateFlow<Boolean> = _hasMoreResults.asStateFlow()
 
-    // State for individual restaurant details
-    private val _restaurantDetails = MutableStateFlow<PlaceDetailResult?>(null)
-    val restaurantDetails: StateFlow<PlaceDetailResult?> = _restaurantDetails.asStateFlow()
+    // State for individual restaurant details (per restaurantId)
+    private val _restaurantDetailsMap = MutableStateFlow<Map<String, PlaceDetailResult?>>(emptyMap())
+    val restaurantDetailsMap: StateFlow<Map<String, PlaceDetailResult?>> = _restaurantDetailsMap.asStateFlow()
 
-    private val _detailsLoading = MutableStateFlow(false)
-    val detailsLoading: StateFlow<Boolean> = _detailsLoading.asStateFlow()
+    private val _detailsLoadingMap = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val detailsLoadingMap: StateFlow<Map<String, Boolean>> = _detailsLoadingMap.asStateFlow()
 
-    private val _detailsErrorMessage = MutableStateFlow<String?>(null)
-    val detailsErrorMessage: StateFlow<String?> = _detailsErrorMessage.asStateFlow()
+    private val _detailsErrorMap = MutableStateFlow<Map<String, String?>>(emptyMap())
+    val detailsErrorMap: StateFlow<Map<String, String?>> = _detailsErrorMap.asStateFlow()
 
     private val fusedLocationClient: FusedLocationProviderClient =
             LocationServices.getFusedLocationProviderClient(context)
@@ -516,52 +516,31 @@ constructor(
         _isLoadingMore.value = false
     }
 
-    // Fetch details for a specific restaurant
+    // Fetch details for a specific restaurant (per restaurantId)
     suspend fun fetchRestaurantDetails(placeId: String) {
-        _detailsLoading.value = true
-        _detailsErrorMessage.value = null
-        _restaurantDetails.value = null
-        Log.d("RestaurantController", "Fetching details for placeId: $placeId")
-
-        if (apiKey.isEmpty()) {
-            Log.e("RestaurantController", "API key not initialized or empty for details fetch")
-            _detailsErrorMessage.value = "Maps API key not configured"
-            _detailsLoading.value = false
-            return
-        }
-
-        val fieldsToFetch =
+        _detailsLoadingMap.value = _detailsLoadingMap.value + (placeId to true)
+        _detailsErrorMap.value = _detailsErrorMap.value + (placeId to null)
+        try {
+            val fieldsToFetch =
                 "name,formatted_address,international_phone_number,website,opening_hours,rating,user_ratings_total,price_level,photo,geometry,place_id,vicinity,types"
 
-        try {
-            val response =
-                    withContext(Dispatchers.IO) {
-                        RestaurantApiClient.placesApiService.getRestaurantDetails(
-                                placeId = placeId,
-                                fields = fieldsToFetch,
-                                apiKey = apiKey
-                        )
-                    }
+            val response = withContext(Dispatchers.IO) {
+                RestaurantApiClient.placesApiService.getRestaurantDetails(
+                    placeId = placeId,
+                    fields = fieldsToFetch,
+                    apiKey = apiKey
+                )
+            }
 
             if (response.status == "OK" && response.result != null) {
-                _restaurantDetails.value = response.result
-                Log.d(
-                        "RestaurantController",
-                        "Successfully fetched details: ${response.result.name}"
-                )
+                _restaurantDetailsMap.value = _restaurantDetailsMap.value + (placeId to response.result)
             } else {
-                Log.e(
-                        "RestaurantController",
-                        "Error fetching details: ${response.status} - ${response.errorMessage}"
-                )
-                _detailsErrorMessage.value =
-                        response.errorMessage ?: "Error fetching details: ${response.status}"
+                _detailsErrorMap.value = _detailsErrorMap.value + (placeId to (response.errorMessage ?: "Error fetching details: \\${response.status}"))
             }
         } catch (e: Exception) {
-            Log.e("RestaurantController", "Exception fetching details: ${e.message}", e)
-            _detailsErrorMessage.value = "Exception: ${e.message}"
+            _detailsErrorMap.value = _detailsErrorMap.value + (placeId to "Exception: \\${e.message}")
         } finally {
-            _detailsLoading.value = false
+            _detailsLoadingMap.value = _detailsLoadingMap.value + (placeId to false)
         }
     }
 }
