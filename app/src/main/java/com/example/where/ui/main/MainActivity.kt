@@ -8,12 +8,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -24,36 +21,35 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.where.BuildConfig
 import com.example.where.R
 import com.example.where.controller.RestaurantController
 import com.example.where.ui.auth.AuthViewModel
 import com.example.where.ui.auth.SignInScreen
 import com.example.where.ui.auth.SignUpScreen
+import com.example.where.ui.screens.groups.GroupDetailScreen
+import com.example.where.ui.screens.groups.GroupsScreen
 import com.example.where.ui.screens.home.HomeScreen
 import com.example.where.ui.screens.onboarding.OnboardingScreen
 import com.example.where.ui.screens.onboarding.OnboardingViewModel
 import com.example.where.ui.screens.profile.ProfileScreen
-import com.example.where.ui.screens.shared.BottomNavBar
 import com.example.where.ui.theme.WhereTheme
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.navigation.NavController
-import com.example.where.ui.screens.groups.GroupDetailScreen
-import com.example.where.ui.screens.shared.BottomNavBar
-import com.example.where.ui.screens.groups.GroupsScreen
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var dataStore: DataStore<Preferences>
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -61,24 +57,21 @@ class MainActivity : ComponentActivity() {
                 Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
-                ) { WhereApp() }
+                ) { WhereApp(dataStore = dataStore) }
             }
         }
     }
 }
 
 @Composable
-fun WhereApp() {
+fun WhereApp(dataStore: DataStore<Preferences>) {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = hiltViewModel()
     val onboardingViewModel: OnboardingViewModel = hiltViewModel()
     val context = LocalContext.current
 
-    // Initialize RestaurantController
-    val restaurantController = remember { RestaurantController(context) }
-    LaunchedEffect(Unit) {
-        restaurantController.setApiKey(apiKey)
-    }
+    val apiKey = BuildConfig.MAPS_API_KEY
+    val restaurantController = remember { RestaurantController(context, apiKey) }
 
     // Track if initial destination has been determined
     var isInitializing by remember { mutableStateOf(true) }
@@ -214,133 +207,81 @@ fun WhereApp() {
         // Main app flow (post-authentication)
         composable("home") {
             HomeScreen(
-                navController = navController,
-                onSignOut = {
-                    authViewModel.signOut(dataStore)
-                    onboardingViewModel.resetOnSignOut()
-                    navController.navigate("sign_in") {
-                        popUpTo(0)
-                    }
-                },
-                onNavItemClick = { route ->
-                    Log.d("Navigation", "HomeScreen: onNavItemClick called with route: $route")
-                    Log.d("Navigation", "Current route: ${navController.currentDestination?.route}")
-                    if (route != navController.currentDestination?.route) {
-                        navController.navigate(route) {
-                            popUpTo("home") {
-                                saveState = true
-                            }
+                    navController = navController,
+                    onNavItemClick = { route ->
+                        Log.d("Navigation", "HomeScreen: onNavItemClick called with route: $route")
+                        Log.d(
+                                "Navigation",
+                                "Current route: ${navController.currentDestination?.route}"
+                        )
+                        if (route != navController.currentDestination?.route) {
+                            navController.navigate(route) { popUpTo("home") { saveState = true } }
+                            Log.d("Navigation", "Navigating to $route")
+                        } else {
+                            Log.d("Navigation", "Already on route: $route")
                         }
-                        Log.d("Navigation", "Navigating to $route")
-                    } else {
-                        Log.d("Navigation", "Already on route: $route")
                     }
             )
         }
         composable("groups") {
             GroupsScreen(
-                navController = navController,
-                onNavItemClick = { route ->
-                    Log.d("Navigation", "GroupsScreen: onNavItemClick called with route: $route")
-                    Log.d("Navigation", "Current route: ${navController.currentDestination?.route}")
-                    if (route != navController.currentDestination?.route) {
-                        navController.navigate(route) {
-                            popUpTo("home") {
-                                saveState = true
-                            }
+                    navController = navController,
+                    onNavItemClick = { route ->
+                        Log.d(
+                                "Navigation",
+                                "GroupsScreen: onNavItemClick called with route: $route"
+                        )
+                        Log.d(
+                                "Navigation",
+                                "Current route: ${navController.currentDestination?.route}"
+                        )
+                        if (route != navController.currentDestination?.route) {
+                            navController.navigate(route) { popUpTo("home") { saveState = true } }
+                            Log.d("Navigation", "Navigating to $route")
+                        } else {
+                            Log.d("Navigation", "Already on route: $route")
                         }
-                        Log.d("Navigation", "Navigating to $route")
-                    } else {
-                        Log.d("Navigation", "Already on route: $route")
-                    }
-                },
-                dataStore = dataStore
+                    },
+                    dataStore = dataStore
             )
         }
         composable("groupDetail/{groupId}") { backStackEntry ->
             val groupId = backStackEntry.arguments?.getString("groupId") ?: ""
             GroupDetailScreen(
-                navController = navController,
-                groupId = groupId,
-                restaurantController = restaurantController
-            )
-        }
-        composable("meetup") {
-            MeetupScreen(
-                navController = navController,
-                onNavItemClick = { route ->
-                    Log.d("Navigation", "MeetupScreen: onNavItemClick called with route: $route")
-                    Log.d("Navigation", "Current route: ${navController.currentDestination?.route}")
-                    if (route != navController.currentDestination?.route) {
-                        navController.navigate(route) {
-                            popUpTo("home") {
-                                saveState = true
-                            }
-                        }
-                        Log.d("Navigation", "Navigating to $route")
-                    } else {
-                        Log.d("Navigation", "Already on route: $route")
-                    }
+                    navController = navController,
+                    groupId = groupId,
+                    restaurantController = restaurantController
             )
         }
         composable("profile") {
             ProfileScreen(
-                viewModel = viewModel(factory = ProfileViewModelFactory(dataStore, context)),
-                navController = navController,
-                onSignOut = {
-                    authViewModel.signOut(dataStore)
-                    onboardingViewModel.resetOnSignOut()
-                    navController.navigate("sign_in") {
-                        popUpTo(0)
-                    }
-                },
-                onNavItemClick = { route ->
-                    Log.d("Navigation", "ProfileScreen: onNavItemClick called with route: $route")
-                    Log.d("Navigation", "Current route: ${navController.currentDestination?.route}")
-                    if (route != navController.currentDestination?.route) {
-                        navController.navigate(route) {
-                            popUpTo("home") { // Use "home" instead of startDestinationId
-                                saveState = true
+                    navController = navController,
+                    onSignOut = {
+                        authViewModel.signOut()
+                        onboardingViewModel.resetOnSignOut()
+                        navController.navigate("sign_in") { popUpTo(0) }
+                    },
+                    onNavItemClick = { route ->
+                        Log.d(
+                                "Navigation",
+                                "ProfileScreen: onNavItemClick called with route: $route"
+                        )
+                        Log.d(
+                                "Navigation",
+                                "Current route: ${navController.currentDestination?.route}"
+                        )
+                        if (route != navController.currentDestination?.route) {
+                            navController.navigate(route) {
+                                popUpTo("home") { // Use "home" instead of startDestinationId
+                                    saveState = true
+                                }
                             }
+                            Log.d("Navigation", "Navigating to $route")
+                        } else {
+                            Log.d("Navigation", "Already on route: $route")
                         }
-                        Log.d("Navigation", "Navigating to $route")
-                    } else {
-                        Log.d("Navigation", "Already on route: $route")
                     }
             )
         }
-    }
-}
-
-@Composable
-fun GroupsScreen(
-    navController: NavController,
-    onNavItemClick: (String) -> Unit,
-    dataStore: DataStore<Preferences>
-) {
-    Scaffold(
-            bottomBar = { BottomNavBar(selectedRoute = "groups", onNavItemClick = onNavItemClick) }
-    ) { innerPadding ->
-        Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-        ) { Text("Groups Screen (Placeholder)") }
-    }
-}
-
-// Placeholder MeetupScreen
-@Composable
-fun MeetupScreen(navController: NavController, onNavItemClick: (String) -> Unit) {
-    Scaffold(
-            bottomBar = { BottomNavBar(selectedRoute = "meetup", onNavItemClick = onNavItemClick) }
-    ) { innerPadding ->
-        Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-        ) { Text("Meetup Screen (Placeholder)") }
     }
 }
