@@ -22,7 +22,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.where.model.UserPreferences
 import com.example.where.ui.screens.shared.BottomNavBar
@@ -42,7 +42,7 @@ val LighterPurple = Color(0xFFF6F2FF)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    viewModel: ProfileViewModel = viewModel(),
+    viewModel: ProfileViewModel = hiltViewModel(),
     navController: NavController,
     onSignOut: () -> Unit,
     onNavItemClick: (String) -> Unit = {}

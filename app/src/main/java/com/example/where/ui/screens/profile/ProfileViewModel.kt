@@ -1,30 +1,33 @@
 package com.example.where.ui.screens.profile
 
-import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.where.controller.RestaurantController
 import com.example.where.model.UserPreferences
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import android.util.Log
-import androidx.datastore.preferences.core.edit
-import com.example.where.controller.RestaurantController
 
-class ProfileViewModel(
-    private val dataStore: DataStore<Preferences>,
-    context: Context,
-    private val restaurantController: RestaurantController = RestaurantController(context)
+@HiltViewModel
+class ProfileViewModel
+@Inject
+constructor(
+        private val dataStore: DataStore<Preferences>,
+        private val restaurantController: RestaurantController
 ) : ViewModel() {
 
     // User information
@@ -54,19 +57,18 @@ class ProfileViewModel(
             errorMessage.value = null
 
             restaurantController.getUserLocation(
-                onSuccess = { latLng ->
-                    userLocation.value = restaurantController.userCity.value
-                        ?: "Unknown Location"
-                    isLoading.value = false
-                },
-                onError = { error ->
-                    userLocation.value = error
-                    isLoading.value = false
-                }
+                    onSuccess = { latLng ->
+                        userLocation.value =
+                                restaurantController.userCity.value ?: "Unknown Location"
+                        isLoading.value = false
+                    },
+                    onError = { error ->
+                        userLocation.value = error
+                        isLoading.value = false
+                    }
             )
         }
     }
-
 
     private fun loadUserData() {
         viewModelScope.launch {
@@ -82,43 +84,56 @@ class ProfileViewModel(
                 val dietaryRestrictions = parseJsonToList(dietaryRestrictionsJson)
                 val cuisinePreferences = parseJsonToList(cuisinePreferencesJson)
 
-                _userPreferences.value = UserPreferences(
-                    dietaryRestrictions = dietaryRestrictions,
-                    cuisinePreferences = cuisinePreferences,
-                    priceRange = priceRange
+                _userPreferences.value =
+                        UserPreferences(
+                                dietaryRestrictions = dietaryRestrictions,
+                                cuisinePreferences = cuisinePreferences,
+                                priceRange = priceRange
+                        )
+                Log.d(
+                        "ProfileViewModel",
+                        "Loaded preferences from DataStore: $dietaryRestrictions, $cuisinePreferences, $priceRange"
                 )
-                Log.d("ProfileViewModel", "Loaded preferences from DataStore: $dietaryRestrictions, $cuisinePreferences, $priceRange")
 
                 // Sync with Firestore
                 val currentUser = FirebaseAuth.getInstance().currentUser
                 if (currentUser != null) {
                     Log.d("ProfileViewModel", "Fetching data for user ${currentUser.uid}")
                     val db = FirebaseFirestore.getInstance()
-                    val documentSnapshot = db.collection("users")
-                        .document(currentUser.uid)
-                        .get()
-                        .await()
+                    val documentSnapshot =
+                            db.collection("users").document(currentUser.uid).get().await()
 
                     if (documentSnapshot.exists()) {
                         userName.value = documentSnapshot.getString("displayName") ?: "Unknown User"
-//                        userLocation.value = restaurantController.userCity.value ?: "Unknown Location"
-                        val firestoreDietaryRestrictions = documentSnapshot.get("dietaryRestrictions") as? List<String> ?: emptyList()
-                        val firestoreCuisinePreferences = documentSnapshot.get("cuisinePreferences") as? List<String> ?: emptyList()
-                        val firestorePriceRange = documentSnapshot.getLong("priceRange")?.toInt() ?: 2
+                        //                        userLocation.value =
+                        // restaurantController.userCity.value ?: "Unknown Location"
+                        val firestoreDietaryRestrictions =
+                                documentSnapshot.get("dietaryRestrictions") as? List<String>
+                                        ?: emptyList()
+                        val firestoreCuisinePreferences =
+                                documentSnapshot.get("cuisinePreferences") as? List<String>
+                                        ?: emptyList()
+                        val firestorePriceRange =
+                                documentSnapshot.getLong("priceRange")?.toInt() ?: 2
 
-                        _userPreferences.value = UserPreferences(
-                            dietaryRestrictions = firestoreDietaryRestrictions,
-                            cuisinePreferences = firestoreCuisinePreferences,
-                            priceRange = firestorePriceRange
-                        )
+                        _userPreferences.value =
+                                UserPreferences(
+                                        dietaryRestrictions = firestoreDietaryRestrictions,
+                                        cuisinePreferences = firestoreCuisinePreferences,
+                                        priceRange = firestorePriceRange
+                                )
 
                         // Update DataStore with Firestore data
                         dataStore.edit { prefs ->
-                            prefs[DIETARY_RESTRICTIONS_KEY] = listToJson(firestoreDietaryRestrictions)
+                            prefs[DIETARY_RESTRICTIONS_KEY] =
+                                    listToJson(firestoreDietaryRestrictions)
                             prefs[CUISINE_PREFERENCES_KEY] = listToJson(firestoreCuisinePreferences)
                             prefs[PRICE_RANGE_KEY] = firestorePriceRange
                         }
-                        Log.d("ProfileViewModel", "Synced Firestore data to DataStore: $userName, preferences=$_userPreferences")
+                        Log.d(
+                                "ProfileViewModel",
+                                "Synced Firestore data to DataStore: $userName, preferences=$_userPreferences"
+                        )
                     } else {
                         Log.d("ProfileViewModel", "No user document found in Firestore")
                         errorMessage.value = "User profile not found"
@@ -160,14 +175,16 @@ class ProfileViewModel(
                 val currentUser = FirebaseAuth.getInstance().currentUser
                 if (currentUser != null) {
                     val db = FirebaseFirestore.getInstance()
-                    val userData = hashMapOf(
-                        "dietaryRestrictions" to preferences.dietaryRestrictions,
-                        "cuisinePreferences" to preferences.cuisinePreferences,
-                        "priceRange" to preferences.priceRange
-                    )
-                    db.collection("users").document(currentUser.uid)
-                        .update(userData as Map<String, Any>)
-                        .await()
+                    val userData =
+                            hashMapOf(
+                                    "dietaryRestrictions" to preferences.dietaryRestrictions,
+                                    "cuisinePreferences" to preferences.cuisinePreferences,
+                                    "priceRange" to preferences.priceRange
+                            )
+                    db.collection("users")
+                            .document(currentUser.uid)
+                            .update(userData as Map<String, Any>)
+                            .await()
                     Log.d("ProfileViewModel", "User preferences updated in Firestore")
                 } else {
                     errorMessage.value = "User not authenticated"
@@ -184,9 +201,7 @@ class ProfileViewModel(
         FirebaseAuth.getInstance().signOut()
         viewModelScope.launch {
             try {
-                dataStore.edit { preferences ->
-                    preferences.clear()
-                }
+                dataStore.edit { preferences -> preferences.clear() }
                 Log.d("ProfileViewModel", "Cleared DataStore on sign out")
             } catch (e: Exception) {
                 Log.e("ProfileViewModel", "Failed to clear DataStore", e)
