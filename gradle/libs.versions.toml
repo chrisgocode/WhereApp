@@ -20,6 +20,7 @@ retrofit2Gson = "2.11.0"
 secretsGradlePlugin = "2.0.1"
 firebaseFirestoreKtx = "25.1.0"
 firebaseBom = "33.2.0"
+firebaseStorageKtx = "21.0.1"
 
 
 [libraries]
@@ -48,6 +49,7 @@ retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = 
 retrofit2-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit2Gson" }
 firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-firestore-ktx", version.ref = "firebaseFirestoreKtx" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-storage-ktx = { group = "com.google.firebase", name = "firebase-storage-ktx", version.ref = "firebaseStorageKtx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
