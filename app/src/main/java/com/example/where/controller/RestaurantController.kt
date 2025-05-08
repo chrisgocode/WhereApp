@@ -64,7 +64,6 @@ class RestaurantController
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    // Pagination token (for loading more results)
     private var nextPageToken: String? = null
 
     // Are more results available from the API?
@@ -81,10 +80,18 @@ class RestaurantController
     private val _detailsErrorMessage = MutableStateFlow<String?>(null)
     val detailsErrorMessage: StateFlow<String?> = _detailsErrorMessage.asStateFlow()
 
-    // Location client
+    private var _detailsLoading = mutableStateOf(false)
+    val detailsLoading = _detailsLoading
+
+    private var _detailsErrorMessage = mutableStateOf<String?>(null)
+    val detailsErrorMessage = _detailsErrorMessage
+
+    private var _restaurantDetails = mutableStateOf<Map<String, Any>?>(null)
+    val restaurantDetails = _restaurantDetails
+
     private val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
-
+        
     // Check if we have location permissions
     private fun hasLocationPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
@@ -94,7 +101,6 @@ class RestaurantController
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    // Get user's current location
     suspend fun getUserLocation(onSuccess: (LatLng) -> Unit, onError: (String) -> Unit) {
         Log.d("RestaurantController", "Getting user location...")
         try {
@@ -109,23 +115,11 @@ class RestaurantController
         } catch (e: SecurityException) {
             Log.e("RestaurantController", "Security exception: ${e.message}")
             onError("Location permission not granted")
-
-            // use a default location on permission error
-            Log.d(
-                "RestaurantController",
-                "Permission not granted, using default location for emulator testing"
-            )
             val defaultLatLng = LatLng(37.7749, -122.4194)
             _userLocation.value = defaultLatLng
             onSuccess(defaultLatLng)
         } catch (e: Exception) {
             Log.e("RestaurantController", "Error getting location: ${e.message}")
-
-            // use a default location on failure
-            Log.d(
-                "RestaurantController",
-                "Error occurred, using default location for emulator testing"
-            )
             val defaultLatLng = LatLng(37.7749, -122.4194)
             _userLocation.value = defaultLatLng
             onSuccess(defaultLatLng)
@@ -142,7 +136,6 @@ class RestaurantController
                     "Unknown"
                 } else {
                     val addr = list[0]
-                    // prefer locality (city), then subAdminArea, then adminArea
                     addr.locality ?: addr.subAdminArea ?: addr.adminArea ?: "Unknown"
                 }
                 _userCity.value = cityName
@@ -157,40 +150,28 @@ class RestaurantController
         }
     }
 
-    // Properly suspending function to get location
     private suspend fun getLocationSuspend(): LatLng = suspendCancellableCoroutine { continuation ->
         try {
-            // Double-check permission before accessing location
             if (!hasLocationPermission()) {
                 continuation.resumeWithException(
                     SecurityException("Location permission not granted")
                 )
                 return@suspendCancellableCoroutine
             }
+
             fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
                     if (location != null) {
                         val latLng = LatLng(location.latitude, location.longitude)
                         Log.d("RestaurantController", "Location found: $latLng")
                         continuation.resume(latLng)
                     } else {
-                        // if no location available, use a default
-                        // location
-                        Log.d(
-                            "RestaurantController",
-                            "No location available, using default for emulator testing"
-                        )
-                        // San Francisco coordinates
+                        Log.d("RestaurantController", "No location available, using default for emulator testing")
                         val defaultLatLng = LatLng(37.7749, -122.4194)
                         continuation.resume(defaultLatLng)
                     }
                 }.addOnFailureListener { exception ->
                     Log.e("RestaurantController", "Location failure: ${exception.message}")
 
-                    // use a default location on failure
-                    Log.d(
-                        "RestaurantController",
-                        "Location failure, using default for emulator testing"
-                    )
                     val defaultLatLng = LatLng(37.7749, -122.4194)
                     continuation.resume(defaultLatLng)
                 }
@@ -199,11 +180,15 @@ class RestaurantController
             continuation.invokeOnCancellation {
                 Log.d("RestaurantController", "Location request cancelled")
             }
+        } catch (e: SecurityException) {
+            Log.e("RestaurantController", "Security exception: ${e.message}")
+            val defaultLatLng = LatLng(37.7749, -122.4194)
+            continuation.resume(defaultLatLng)
         } catch (e: Exception) {
             continuation.resumeWithException(e)
         }
     }
-
+        
     // Fetch nearby restaurants (initial load)
     suspend fun fetchNearbyRestaurants(
         userPreferences: UserPreferences? = null, searchQuery: String? = null, radius: Int = 8046
@@ -211,7 +196,7 @@ class RestaurantController
         _isLoading.value = true
         _errorMessage.value = null
         nextPageToken = null
-        _nearbyRestaurants.value = emptyList() // Clear existing results for a fresh search
+        _nearbyRestaurants.value = emptyList()
 
         Log.d(
             "RestaurantController",
@@ -271,14 +256,13 @@ class RestaurantController
         )
     }
 
-    // Fetch more results (pagination)
     suspend fun fetchMoreRestaurants() {
         if (!hasMoreResults.value || _isLoadingMore.value || nextPageToken == null) {
             Log.d(
                 "RestaurantController",
                 "Cannot fetch more: hasMoreResults=${hasMoreResults.value}, isLoadingMore=${_isLoadingMore.value}, hasToken=${nextPageToken != null}"
             )
-            return // No more results or already loading
+            return
         }
 
         Log.d("RestaurantController", "Starting to load more, setting isLoadingMore=true")
@@ -291,10 +275,7 @@ class RestaurantController
             return
         }
 
-        // Store the current token before fetching
         val tokenToUse = nextPageToken
-
-        // Places API requires a short delay before using the next_page_token
         delay(2000)
 
         try {
@@ -316,8 +297,6 @@ class RestaurantController
             Log.e("RestaurantController", "Error fetching more restaurants: ${e.message}", e)
             Log.d("RestaurantController", "Error caught, setting isLoadingMore=false")
             _isLoadingMore.value = false
-
-            // If we've used the token but got an error, clear it to prevent reuse
             if (nextPageToken == tokenToUse) {
                 nextPageToken = null
                 _hasMoreResults.value = false
@@ -335,7 +314,6 @@ class RestaurantController
         try {
             withContext(Dispatchers.IO) {
                 val locationString = "${location.latitude},${location.longitude}"
-
                 var minPrice: Int? = null
                 var maxPrice: Int? = null
                 val keywordsCollector = mutableListOf<String>()
@@ -404,19 +382,19 @@ class RestaurantController
         }
     }
 
-    private fun processResponse(response: NearbySearchResponse, location: LatLng) {
-        if (response.status == "OK") {
+    private fun processResponse(response: Map<String, Any>, location: LatLng) {
+        val status = response["status"] as? String
+        if (status == "OK") {
             Log.d(
                 "RestaurantController",
-                "API response successful: ${response.results.size} restaurants found"
+                "API response successful: ${(response["results"] as? List<*>?)?.size ?: 0} restaurants found"
             )
 
-            // Save next page token if available
-            nextPageToken = response.next_page_token
+            nextPageToken = response["next_page_token"] as? String
             _hasMoreResults.value = nextPageToken != null
 
-            // Skip processing if no new results
-            if (response.results.isEmpty()) {
+            val results = response["results"] as? List<Map<String, Any>> ?: emptyList()
+            if (results.isEmpty()) {
                 Log.d(
                     "RestaurantController",
                     "No new restaurants in response, setting hasMoreResults=false"
@@ -481,14 +459,13 @@ class RestaurantController
 
             // Add new restaurants to existing list and sort by distance
             val allRestaurants = _nearbyRestaurants.value + newRestaurants
-            val sortedRestaurants =
-                allRestaurants.distinctBy { it.id }.sortedBy { it.distanceInMeters }
+            val sortedRestaurants = allRestaurants.distinctBy { it.id }.sortedBy { it.distanceInMeters }
             Log.d("RestaurantController", "Processed ${sortedRestaurants.size} total restaurants")
 
             _nearbyRestaurants.value = sortedRestaurants
         } else {
-            Log.e("RestaurantController", "API Error: ${response.status}")
-            _errorMessage.value = "API Error: ${response.status}"
+            Log.e("RestaurantController", "API Error: $status")
+            _errorMessage.value = "API Error: $status"
             _hasMoreResults.value = false
             nextPageToken = null
         }
@@ -500,14 +477,12 @@ class RestaurantController
         )
     }
 
-    // Calculate distance between two coordinates (in meters)
     private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
         val results = FloatArray(1)
         Location.distanceBetween(lat1, lon1, lat2, lon2, results)
         return results[0]
     }
 
-    // Helper method to reset loading states
     fun resetLoadingState() {
         Log.d("RestaurantController", "Explicitly resetting loading states")
         _isLoading.value = false
