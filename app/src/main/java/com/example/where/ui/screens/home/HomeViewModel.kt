@@ -16,6 +16,7 @@ import com.example.where.model.PlaceDetailResult
 import com.example.where.model.Restaurant
 import com.example.where.model.UserPreferences
 import com.google.android.gms.maps.model.LatLng
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlin.random.Random
@@ -41,6 +42,7 @@ constructor(
         private val groupController: GroupController,
         private val userPreferencesController: UserPreferencesController,
         private val userController: UserController,
+        private val firebaseAuth: FirebaseAuth,
         dataStore: DataStore<Preferences>
 ) : ViewModel() {
 
@@ -66,7 +68,7 @@ constructor(
                             scope = viewModelScope,
                             started = SharingStarted.WhileSubscribed(5000),
                             initialValue =
-                                    UserPreferences() // Uses imported UserPreferences default
+                                    UserPreferences()
                     )
 
     companion object {
@@ -182,6 +184,7 @@ constructor(
     private val _groupsErrorMessage = MutableStateFlow<String?>(null)
     val groupsErrorMessage: StateFlow<String?> = _groupsErrorMessage.asStateFlow()
 
+    // This state reflects the poll operation loading state from the controller
     private val _isAddingRestaurantsToGroup = MutableStateFlow(false)
     val isAddingRestaurantsToGroup: StateFlow<Boolean> = _isAddingRestaurantsToGroup.asStateFlow()
 
@@ -263,34 +266,25 @@ constructor(
         viewModelScope.launch {
             groupController.errorMessage.collect { _groupsErrorMessage.value = it }
         }
+        // Observe the renamed state for poll operations
         viewModelScope.launch {
-            groupController.isAddingRestaurants.collect { _isAddingRestaurantsToGroup.value = it }
+            groupController.isOperatingWithPoll.collect { _isAddingRestaurantsToGroup.value = it }
         }
 
+        // Observe the renamed success/error states for poll operations
         viewModelScope.launch {
-            groupController.addRestaurantSuccess.collect { success ->
+            groupController.operationSuccess.collect { success ->
                 if (success) {
-                    Log.d(TAG, "Observed addRestaurantSuccess = true")
-                    _snackbarMessage.value =
-                            "Restaurant(s) added successfully!" // Set Snackbar message
-                    _checkedRestaurantIds.value = emptySet() // Clear selection on success
-                    _showSendModal.value = false // Dismiss modal on success
-
-                    // Reset the success flag in the ViewModel state after setting the message.
-                    // The UI will observe the snackbar message and call clearSnackbarMessage.
-                    groupController.clearAddRestaurantStatus()
+                    Log.d(TAG, "Observed generic operationSuccess = true")
+                    groupController.clearOperationStatus()
                 }
             }
         }
         viewModelScope.launch {
-            groupController.addRestaurantError.collect { error ->
+            groupController.operationError.collect { error ->
                 if (error != null) {
-                    Log.d(TAG, "Observed addRestaurantError = $error")
-                    _snackbarMessage.value = "Error: $error" // Set Snackbar message
-
-                    // Reset the error flag in the ViewModel state after setting the message.
-                    // The UI will observe the snackbar message and call clearSnackbarMessage.
-                    groupController.clearAddRestaurantStatus()
+                    Log.d(TAG, "Observed generic operationError = $error")
+                    groupController.clearOperationStatus()
                 }
             }
         }
@@ -410,7 +404,7 @@ constructor(
         }
     }
 
-    /** Called by the UI's "Load More" button to fetch additional restaurants from the API. */
+    // Called by the UIs "Load More" button to fetch additional restaurants from the API.
     fun fetchMoreRestaurantsFromApi() {
         // Check if there are more results to fetch from API and not already loading
         if (restaurantHasMoreResults.value && !restaurantIsLoadingMore.value) {
@@ -452,20 +446,49 @@ constructor(
     }
 
     fun onSendToGroupConfirmedInModal() {
-        _selectedGroupForModal.value?.let { group ->
-            if (group.id.isNotBlank()) {
-                viewModelScope.launch {
-                    groupController.addRestaurantsToGroup(group.id, _checkedRestaurantIds.value)
-                }
-            } else {
-                Log.e(TAG, "Selected group has no ID.")
-                _snackbarMessage.value = "Error: Selected group is invalid."
-            }
+        val selectedGroup = _selectedGroupForModal.value
+        val currentUserEmail = firebaseAuth.currentUser?.email
+        val restaurantIdsToSend = _checkedRestaurantIds.value
+
+        if (selectedGroup == null) {
+            Log.e(TAG, "No group selected to send restaurants to.")
+            _snackbarMessage.value = "Error: No group selected."
+            return
         }
-                ?: run {
-                    Log.e(TAG, "No group selected to send.")
-                    _snackbarMessage.value = "Error: No group selected."
-                }
+        if (currentUserEmail == null) {
+            Log.e(TAG, "User not authenticated to send restaurants.")
+            _snackbarMessage.value = "Error: User not authenticated."
+            return
+        }
+        if (restaurantIdsToSend.isEmpty()) {
+            Log.w(TAG, "No restaurants selected to send.")
+            _snackbarMessage.value = "No restaurants selected to send."
+            _showSendModal.value = false
+            return
+        }
+
+        viewModelScope.launch {
+
+            val newPollId =
+                    groupController.createPollInGroupWithRestaurants(
+                            groupId = selectedGroup.id,
+                            restaurantIds = restaurantIdsToSend,
+                            currentUserEmail = currentUserEmail
+                    )
+
+            if (newPollId != null) {
+                _snackbarMessage.value = "New poll created with selected restaurants!"
+                _checkedRestaurantIds.value = emptySet() // Clear selection on success
+                _showSendModal.value = false // Dismiss modal on success
+            } else {
+                // Failure occurred, get the error message from the controller
+                _snackbarMessage.value =
+                        groupController.operationError.value ?: "Failed to create poll."
+            }
+            // Clear controller status flags regardless of success/failure after the operation
+            // attempt
+            groupController.clearOperationStatus()
+        }
     }
 
     // Function to clear the snackbar message after it has been shown
@@ -730,5 +753,9 @@ constructor(
                 cuisinePreferences = finalSelectedCuisines,
                 priceRange = minPriceRange
         )
+    }
+
+    fun clearOperationStatus() {
+        groupController.clearOperationStatus()
     }
 }

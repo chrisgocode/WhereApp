@@ -2,16 +2,18 @@ package com.example.where.controller
 
 import android.util.Log
 import com.example.where.model.Group
-import com.example.where.model.RestaurantRef
+import com.example.where.model.Poll
+import com.example.where.model.RestaurantOption
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.tasks.await
-import javax.inject.Singleton
 
 @Singleton
 class GroupController @Inject constructor() {
@@ -28,14 +30,16 @@ class GroupController @Inject constructor() {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    private val _isAddingRestaurants = MutableStateFlow(false)
-    val isAddingRestaurants: StateFlow<Boolean> = _isAddingRestaurants.asStateFlow()
+    private val _isOperatingWithPoll = MutableStateFlow(false)
+    val isOperatingWithPoll: StateFlow<Boolean> =
+            _isOperatingWithPoll.asStateFlow()
 
-    private val _addRestaurantError = MutableStateFlow<String?>(null)
-    val addRestaurantError: StateFlow<String?> = _addRestaurantError.asStateFlow()
+    private val _operationError =
+            MutableStateFlow<String?>(null)
+    val operationError: StateFlow<String?> = _operationError.asStateFlow()
 
-    private val _addRestaurantSuccess = MutableStateFlow(false)
-    val addRestaurantSuccess: StateFlow<Boolean> = _addRestaurantSuccess.asStateFlow()
+    private val _operationSuccess = MutableStateFlow(false)
+    val operationSuccess: StateFlow<Boolean> = _operationSuccess.asStateFlow()
 
     suspend fun fetchUserGroups() {
         val userEmail = auth.currentUser?.email
@@ -56,7 +60,6 @@ class GroupController @Inject constructor() {
             val groups =
                     snapshot.documents.mapNotNull { document ->
                         try {
-                            // Manually map fields, including the document ID
                             val group = document.toObject(Group::class.java)?.copy(id = document.id)
                             Log.d(
                                     "GroupController",
@@ -69,99 +72,84 @@ class GroupController @Inject constructor() {
                                     "Error converting document ${document.id} to Group",
                                     e
                             )
-                            null // Skip documents that fail to convert
+                            null
                         }
                     }
             _userGroups.value = groups
-            Log.d("GroupController", "Successfully fetched ${groups.size} groups.")
+            Log.d(
+                    "GroupController",
+                    "Successfully fetched ${groups.size} groups for user $userEmail."
+            )
         } catch (e: Exception) {
             _errorMessage.value = "Failed to fetch groups: ${e.message}"
-            Log.e("GroupController", "Error fetching groups from Firestore", e)
-            _userGroups.value = emptyList() // Clear groups on error
+            Log.e("GroupController", "Error fetching groups from Firestore for user $userEmail", e)
+            _userGroups.value = emptyList()
         } finally {
             _isLoading.value = false
         }
     }
 
-    suspend fun addRestaurantsToGroup(groupId: String, restaurantIds: Set<String>) {
-        if (groupId.isBlank()) {
-            _addRestaurantError.value = "Invalid group ID."
-            Log.e("GroupController", "Cannot add restaurants: Invalid group ID.")
-            return
-        }
-        if (restaurantIds.isEmpty()) {
-            _addRestaurantError.value = "No restaurants selected."
-            Log.w("GroupController", "No restaurants selected to add.")
-            return // Nothing to add
+    suspend fun createPollInGroupWithRestaurants(
+            groupId: String,
+            restaurantIds: Set<String>,
+            currentUserEmail: String
+    ): String? {
+        if (groupId.isBlank() || restaurantIds.isEmpty() || currentUserEmail.isBlank()) {
+            _operationError.value = "Invalid parameters for creating poll."
+            Log.e(
+                    "GroupController",
+                    "Invalid params: g:$groupId, rIDs_empty:${restaurantIds.isEmpty()}, u:$currentUserEmail"
+            )
+            return null
         }
 
-        _isAddingRestaurants.value = true
-        _addRestaurantError.value = null
-        _addRestaurantSuccess.value = false
+        _isOperatingWithPoll.value = true
+        _operationError.value = null
+        _operationSuccess.value = false
+
         Log.d(
                 "GroupController",
-                "Attempting to add ${restaurantIds.size} restaurants to group ID: $groupId"
+                "Attempting to create new poll in group $groupId with ${restaurantIds.size} restaurants by $currentUserEmail"
         )
-
         val groupDocRef = db.collection("groups").document(groupId)
+        val newPollId =
+                db.collection("groups").document().id // Generate a unique ID for the new poll
 
-        try {
-            // 1. Read the current group document
-            val documentSnapshot = groupDocRef.get().await()
-            if (!documentSnapshot.exists()) {
-                throw Exception("Group document $groupId does not exist.")
-            }
+        return try {
+            val restaurantOptions =
+                    restaurantIds.map {
+                        RestaurantOption(restaurantId = it, votedUsers = emptyList())
+                    }
 
-            // 2. Get the current list of restaurants and their IDs
-            val currentRestaurants =
-                    documentSnapshot.get("restaurants") as? List<Map<String, Any>> ?: emptyList()
-            val existingRestaurantIds =
-                    currentRestaurants.mapNotNull { it["restaurant_id"] as? String }.toSet()
+            val newPoll =
+                    Poll(
+                            id = newPollId,
+                            groupId = groupId,
+                            createdBy = currentUserEmail,
+                            createdAt = Timestamp.now(),
+                            isEnded = false,
+                            restaurants = restaurantOptions
+                    )
+
+            groupDocRef.update("polls", FieldValue.arrayUnion(newPoll)).await()
+
             Log.d(
                     "GroupController",
-                    "Existing restaurant IDs in group $groupId: $existingRestaurantIds"
+                    "Successfully created new poll $newPollId in group $groupId with ${restaurantOptions.size} restaurants."
             )
-
-            // 3. Filter the incoming IDs
-            val newRestaurantIds = restaurantIds.filterNot { it in existingRestaurantIds }
-            Log.d("GroupController", "New restaurant IDs to add: $newRestaurantIds")
-
-            if (newRestaurantIds.isEmpty()) {
-                Log.w(
-                        "GroupController",
-                        "Duplicate restaurants detected. No new restaurants to add to group $groupId."
-                )
-                // Set error message on duplicates
-                _addRestaurantError.value = "Duplicate restaurant detected. No restaurants sent"
-                _addRestaurantSuccess.value = false
-                _isAddingRestaurants.value = false
-                return // Exit early
-            }
-
-            // 4. Create RestaurantRef objects only for the new IDs
-            val restaurantsToAdd =
-                    newRestaurantIds.map { RestaurantRef(restaurant_id = it, count = 0) }
-
-            // 5. Use FieldValue.arrayUnion with the filtered list
-            groupDocRef
-                    .update("restaurants", FieldValue.arrayUnion(*restaurantsToAdd.toTypedArray()))
-                    .await()
-            Log.d(
-                    "GroupController",
-                    "Successfully added ${restaurantsToAdd.size} new restaurants to group $groupId"
-            )
-            _addRestaurantSuccess.value = true
+            _operationSuccess.value = true
+            newPollId
         } catch (e: Exception) {
-            _addRestaurantError.value = "Failed to add restaurants: ${e.message}"
-            Log.e("GroupController", "Error updating group $groupId in Firestore", e)
-            _addRestaurantSuccess.value = false
+            _operationError.value = "Failed to create poll in group $groupId: ${e.message}"
+            Log.e("GroupController", "Error creating poll in group $groupId", e)
+            null
         } finally {
-            _isAddingRestaurants.value = false
+            _isOperatingWithPoll.value = false
         }
     }
 
-    fun clearAddRestaurantStatus() {
-        _addRestaurantError.value = null
-        _addRestaurantSuccess.value = false
+    fun clearOperationStatus() {
+        _operationError.value = null
+        _operationSuccess.value = false
     }
 }
