@@ -86,6 +86,7 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit2.gson)
     implementation(libs.firebase.firestore.ktx)
+    implementation(libs.firebase.storage.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

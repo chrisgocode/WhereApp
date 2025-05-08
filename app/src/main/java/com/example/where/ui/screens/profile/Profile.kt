@@ -1,5 +1,7 @@
 package com.example.where.ui.screens.profile
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,19 +21,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.where.model.UserPreferences
 import com.example.where.ui.screens.shared.BottomNavBar
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.Dp
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.os.Build
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 
 // Theme colors
 val PrimaryPurple = Color(0xFF8A3FFC)
@@ -39,6 +45,7 @@ val BackgroundWhite = Color(0xFFFAFAFA)
 val DarkGray = Color(0xFF333333)
 val LightGray = Color(0xFFE0E0E0)
 val LighterPurple = Color(0xFFF6F2FF)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
@@ -48,15 +55,47 @@ fun ProfileScreen(
     onNavItemClick: (String) -> Unit = {}
 ) {
     val userPreferences by viewModel.userPreferences.collectAsState()
+    val profileImageUrl by viewModel.profileImageUrl.collectAsState()
     val isLoading by viewModel.isLoading
     val errorMessage by viewModel.errorMessage
     val configuration = LocalConfiguration.current
-    val isTablet = configuration.screenWidthDp >= 600 // Tablet threshold
+    val isTablet = configuration.screenWidthDp >= 600
     val horizontalPadding = if (isTablet) 32.dp else 16.dp
     val contentWidth = if (isTablet) 600.dp else Dp.Unspecified
+
     // Dialog states
     var showCuisineDialog by remember { mutableStateOf(false) }
     var showRestrictionsDialog by remember { mutableStateOf(false) }
+    var showPermissionRationale by remember { mutableStateOf(false) }
+
+    // Image picker
+    val context = LocalContext.current
+    val permission = if (Build.VERSION.SDK_INT >= 33) {
+        Manifest.permission.READ_MEDIA_IMAGES
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.onImagePickerRequested()
+        } else {
+            showPermissionRationale = true
+        }
+    }
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let { viewModel.uploadProfileImage(it, context) }
+    }
+
+    // Hide keyboard when not needed
+    val keyboardController = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        keyboardController?.hide()
+    }
+
     Scaffold(
         bottomBar = { BottomNavBar(selectedRoute = "profile", onNavItemClick = onNavItemClick) },
         content = { innerPadding ->
@@ -104,9 +143,7 @@ fun ProfileScreen(
                             )
                             .wrapContentWidth(Alignment.CenterHorizontally)
                     ) {
-                        // Added to match HomeScreen's padding
                         Spacer(modifier = Modifier.height(16.dp))
-
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -131,7 +168,23 @@ fun ProfileScreen(
                         ProfileHeader(
                             name = viewModel.userName.value,
                             location = viewModel.userLocation.value,
-                            isTablet = isTablet
+                            profileImageUrl = profileImageUrl,
+                            isTablet = isTablet,
+                            onImagePick = {
+                                if (ContextCompat.checkSelfPermission(
+                                        context, permission
+                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    viewModel.onImagePickerRequested()
+                                    imagePicker.launch(
+                                        ActivityResultContracts.PickVisualMediaRequest(
+                                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
+                                    )
+                                } else {
+                                    launcher.launch(permission)
+                                }
+                            }
                         )
                         Spacer(modifier = Modifier.height(if (isTablet) 32.dp else 24.dp))
                         PreferencesSection(
@@ -213,6 +266,40 @@ fun ProfileScreen(
             }
         }
     )
+
+    // Permission rationale dialog
+    if (showPermissionRationale) {
+        AlertDialog(
+            onDismissRequest = { showPermissionRationale = false },
+            title = { Text("Permission Required", fontSize = if (isTablet) 20.sp else 18.sp) },
+            text = {
+                Text(
+                    "This app needs access to your gallery to select a profile picture.",
+                    fontSize = if (isTablet) 16.sp else 14.sp
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        launcher.launch(permission)
+                        showPermissionRationale = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = PrimaryPurple)
+                ) {
+                    Text("Grant", fontSize = if (isTablet) 16.sp else 14.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showPermissionRationale = false },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Gray)
+                ) {
+                    Text("Cancel", fontSize = if (isTablet) 16.sp else 14.sp)
+                }
+            }
+        )
+    }
+
     // Cuisine Preferences Dialog
     if (showCuisineDialog) {
         CuisinePreferencesDialog(
@@ -248,6 +335,81 @@ fun ProfileScreen(
             },
             isTablet = isTablet
         )
+    }
+}
+
+@Composable
+fun ProfileHeader(
+    name: String,
+    location: String,
+    profileImageUrl: String?,
+    isTablet: Boolean,
+    onImagePick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentHeight(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(if (isTablet) 150.dp else 120.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, Color.White, CircleShape)
+                    .clickable { onImagePick() },
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = profileImageUrl ?: "https://via.placeholder.com/150", // Default placeholder
+                    contentDescription = "Profile Picture",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+                // Overlay for visual feedback
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape),
+                    color = Color.Black.copy(alpha = 0.3f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Upload Image",
+                        tint = Color.White,
+                        modifier = Modifier.size(if (isTablet) 40.dp else 32.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 16.dp))
+            Text(
+                text = name,
+                fontSize = if (isTablet) 24.sp else 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = "Location",
+                    tint = Color.Gray,
+                    modifier = Modifier.size(if (isTablet) 20.dp else 16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = location,
+                    color = Color.Gray,
+                    fontSize = if (isTablet) 16.sp else 14.sp
+                )
+            }
+            Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 16.dp))
+        }
     }
 }
 
@@ -405,111 +567,6 @@ fun DietaryRestrictionsDialog(
 }
 
 @Composable
-fun ProfileHeader(
-    name: String,
-    location: String,
-    isTablet: Boolean
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentHeight(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(if (isTablet) 150.dp else 120.dp)
-                    .clip(CircleShape)
-                    .background(LightGray)
-                    .border(2.dp, Color.White, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                // Placeholder for profile image
-            }
-
-            Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 16.dp))
-
-            Text(
-                text = name,
-                fontSize = if (isTablet) 24.sp else 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = "Location",
-                    tint = Color.Gray,
-                    modifier = Modifier.size(if (isTablet) 20.dp else 16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = location,
-                    color = Color.Gray,
-                    fontSize = if (isTablet) 16.sp else 14.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(if (isTablet) 20.dp else 16.dp))
-
-            // Commented out Edit Profile and Settings buttons
-            /*
-            Row(
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                OutlinedButton(
-                    onClick = { /* onEditProfile() */ },
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.width(if (isTablet) 180.dp else 160.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = DarkGray
-                    )
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit",
-                            modifier = Modifier.size(if (isTablet) 20.dp else 18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Edit Profile", fontSize = if (isTablet) 16.sp else 14.sp)
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = { /* onSettings() */ },
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.width(if (isTablet) 180.dp else 160.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = DarkGray
-                    )
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            modifier = Modifier.size(if (isTablet) 20.dp else 18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Settings", fontSize = if (isTablet) 16.sp else 14.sp)
-                    }
-                }
-            }
-            */
-        }
-    }
-}
-
-@Composable
 fun PreferencesSection(
     title: String,
     onUpdate: () -> Unit,
@@ -595,7 +652,6 @@ fun RestrictionChip(
     }
 }
 
-// FlowRow implementation for wrapping chips
 @Composable
 fun FlowRow(
     modifier: Modifier = Modifier,
