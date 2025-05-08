@@ -33,6 +33,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.where.R
+import com.example.where.controller.RestaurantController
 import com.example.where.ui.auth.AuthViewModel
 import com.example.where.ui.auth.SignInScreen
 import com.example.where.ui.auth.SignUpScreen
@@ -48,7 +49,9 @@ import com.google.android.gms.common.api.ApiException
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.navigation.NavController
+import com.example.where.ui.screens.groups.GroupDetailScreen
 import com.example.where.ui.screens.shared.BottomNavBar
+import com.example.where.ui.screens.groups.GroupsScreen
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
 
@@ -61,7 +64,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    WhereApp(dataStore = dataStore)
+                    WhereApp(dataStore = dataStore, apiKey = getString(R.string.google_maps_api_key))
                 }
             }
         }
@@ -69,11 +72,17 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun WhereApp(dataStore: DataStore<Preferences>) {
+fun WhereApp(dataStore: DataStore<Preferences>, apiKey: String) {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = viewModel()
     val onboardingViewModel: OnboardingViewModel = viewModel { OnboardingViewModel(dataStore) }
     val context = LocalContext.current
+
+    // Initialize RestaurantController
+    val restaurantController = remember { RestaurantController(context) }
+    LaunchedEffect(Unit) {
+        restaurantController.setApiKey(apiKey)
+    }
 
     // Track if initial destination has been determined
     var isInitializing by remember { mutableStateOf(true) }
@@ -213,14 +222,19 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
                     }
                 },
                 onNavItemClick = { route ->
+                    Log.d("Navigation", "HomeScreen: onNavItemClick called with route: $route")
+                    Log.d("Navigation", "Current route: ${navController.currentDestination?.route}")
                     if (route != navController.currentDestination?.route) {
                         navController.navigate(route) {
-                            popUpTo(navController.graph.startDestinationId) {
+                            popUpTo("home") {
                                 saveState = true
                             }
                             launchSingleTop = true
                             restoreState = true
                         }
+                        Log.d("Navigation", "Navigating to $route")
+                    } else {
+                        Log.d("Navigation", "Already on route: $route")
                     }
                 }
             )
@@ -229,30 +243,49 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
             GroupsScreen(
                 navController = navController,
                 onNavItemClick = { route ->
+                    Log.d("Navigation", "GroupsScreen: onNavItemClick called with route: $route")
+                    Log.d("Navigation", "Current route: ${navController.currentDestination?.route}")
                     if (route != navController.currentDestination?.route) {
                         navController.navigate(route) {
-                            popUpTo(navController.graph.startDestinationId) {
+                            popUpTo("home") {
                                 saveState = true
                             }
                             launchSingleTop = true
                             restoreState = true
                         }
+                        Log.d("Navigation", "Navigating to $route")
+                    } else {
+                        Log.d("Navigation", "Already on route: $route")
                     }
-                }
+                },
+                dataStore = dataStore
+            )
+        }
+        composable("groupDetail/{groupId}") { backStackEntry ->
+            val groupId = backStackEntry.arguments?.getString("groupId") ?: ""
+            GroupDetailScreen(
+                navController = navController,
+                groupId = groupId,
+                restaurantController = restaurantController
             )
         }
         composable("meetup") {
             MeetupScreen(
                 navController = navController,
                 onNavItemClick = { route ->
+                    Log.d("Navigation", "MeetupScreen: onNavItemClick called with route: $route")
+                    Log.d("Navigation", "Current route: ${navController.currentDestination?.route}")
                     if (route != navController.currentDestination?.route) {
                         navController.navigate(route) {
-                            popUpTo(navController.graph.startDestinationId) {
+                            popUpTo("home") {
                                 saveState = true
                             }
                             launchSingleTop = true
                             restoreState = true
                         }
+                        Log.d("Navigation", "Navigating to $route")
+                    } else {
+                        Log.d("Navigation", "Already on route: $route")
                     }
                 }
             )
@@ -269,14 +302,19 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
                     }
                 },
                 onNavItemClick = { route ->
+                    Log.d("Navigation", "ProfileScreen: onNavItemClick called with route: $route")
+                    Log.d("Navigation", "Current route: ${navController.currentDestination?.route}")
                     if (route != navController.currentDestination?.route) {
                         navController.navigate(route) {
-                            popUpTo(navController.graph.startDestinationId) {
+                            popUpTo("home") { // Use "home" instead of startDestinationId
                                 saveState = true
                             }
                             launchSingleTop = true
                             restoreState = true
                         }
+                        Log.d("Navigation", "Navigating to $route")
+                    } else {
+                        Log.d("Navigation", "Already on route: $route")
                     }
                 }
             )
@@ -288,7 +326,8 @@ fun WhereApp(dataStore: DataStore<Preferences>) {
 @Composable
 fun GroupsScreen(
     navController: NavController,
-    onNavItemClick: (String) -> Unit
+    onNavItemClick: (String) -> Unit,
+    dataStore: DataStore<Preferences>
 ) {
     Scaffold(
         bottomBar = { BottomNavBar(selectedRoute = "groups", onNavItemClick = onNavItemClick) }

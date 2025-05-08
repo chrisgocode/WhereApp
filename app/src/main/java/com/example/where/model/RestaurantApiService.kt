@@ -14,7 +14,14 @@ interface PlacesApiService {
         @Query("key") apiKey: String,
         @Query("pagetoken") pageToken: String? = null,
         @Query("rankby") rankby: String? = null
-    ): NearbySearchResponse
+    ): Map<String, Any>
+
+    @GET("details/json")
+    suspend fun getRestaurantDetails(
+        @Query("place_id") placeId: String,
+        @Query("fields") fields: String,
+        @Query("key") apiKey: String
+    ): Map<String, Any>
 }
 
 object RestaurantApiClient {

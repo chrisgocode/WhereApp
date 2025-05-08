@@ -21,8 +21,6 @@ data class NearbySearchResponse(
     val next_page_token: String? = null
 )
 
-// TODO:
-//  Extract image to use for each restaurant?
 data class PlaceResult(
     val place_id: String,
     val name: String,
@@ -30,7 +28,8 @@ data class PlaceResult(
     val geometry: Geometry,
     val rating: Float?,
     val price_level: Int?,
-    val types: List<String>
+    val types: List<String>,
+    val photo: String? = null // Assuming this is a photo_reference
 )
 
 data class Geometry(val location: GeographicLocation)

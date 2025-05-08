@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Where</string>
+    <string name="google_maps_api_key">AIzaSyAJn68WBPUAHCeshkYjy9f3z2f26srtIPU</string>
     <string name="default_web_client_id">514230416075-546hbfkk256s04ufroln39o2jj82jbba.apps.googleusercontent.com</string>
 </resources>
