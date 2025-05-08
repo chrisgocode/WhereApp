@@ -119,6 +119,12 @@ fun HomeScreen(
     val restaurantIsLoadingMore by viewModel.restaurantIsLoadingMore.collectAsState()
     val restaurantHasMoreResults by viewModel.restaurantHasMoreResults.collectAsState()
 
+    // Collect Filter Modal state
+    val showFilterModal by viewModel.showFilterModal.collectAsState()
+    val selectedCuisineFilters by viewModel.selectedCuisineFilters.collectAsState()
+    val currentUserPreferences by viewModel.currentUserPreferences.collectAsState()
+    val selectedGroupFilters by viewModel.selectedGroupFilters.collectAsState()
+
     val apiKey = BuildConfig.MAPS_API_KEY
 
     // Collect Restaurant List & Detail Modal Logic from ViewModel
@@ -235,6 +241,15 @@ fun HomeScreen(
                                     imageVector = Icons.Default.Search,
                                     contentDescription = "Search"
                                 )
+                            },
+                            trailingIcon = {
+                                Button(
+                                    onClick = { viewModel.onFilterButtonClicked() },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color.Transparent,
+                                        contentColor = PrimaryPurple
+                                    )
+                                ) { Text("Filter") }
                             },
                             shape = RoundedCornerShape(8.dp),
                             colors = TextFieldDefaults.colors(
@@ -505,6 +520,22 @@ fun HomeScreen(
                     errorMessage = detailsErrorMessageText,
                     onDismiss = { viewModel.onDismissRestaurantDetailModal() },
                     apiKey = apiKey
+                )
+            }
+
+            // Conditionally display the Filter Modal
+            if (showFilterModal) {
+                FilterModal(
+                    onDismiss = { viewModel.onDismissFilterModal() },
+                    allCuisines = currentUserPreferences.cuisinePreferences,
+                    selectedCuisines = selectedCuisineFilters,
+                    onCuisineSelected = { cuisine, isChecked ->
+                        viewModel.onCuisineFilterChanged(cuisine, isChecked)
+                    },
+                    userGroups = userGroupsForModal,
+                    selectedGroupIds = selectedGroupFilters,
+                    onGroupSelected = viewModel::onGroupFilterChanged,
+                    onApplyClick = viewModel::applyFilters
                 )
             }
         })
@@ -1045,6 +1076,109 @@ fun DetailItem(
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(text = text, fontSize = 16.sp, color = DarkGray)
+    }
+}
+
+@Composable
+fun FilterModal(
+    onDismiss: () -> Unit,
+    allCuisines: List<String>,
+    selectedCuisines: Set<String>,
+    onCuisineSelected: (String, Boolean) -> Unit,
+    userGroups: List<Group>,
+    selectedGroupIds: Set<String>,
+    onGroupSelected: (String, Boolean) -> Unit,
+    onApplyClick: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Box(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Filter Results", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, contentDescription = "Close")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Cuisine Preferences", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (allCuisines.isEmpty()) {
+                        Text("No cuisine preferences set.", color = Color.Gray)
+                    } else {
+                        allCuisines.forEach { cuisine ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onCuisineSelected(
+                                            cuisine, !selectedCuisines.contains(cuisine)
+                                        )
+                                    }
+                                    .padding(vertical = 4.dp)) {
+                                Checkbox(
+                                    checked = selectedCuisines.contains(cuisine),
+                                    onCheckedChange = { isChecked ->
+                                        onCuisineSelected(cuisine, isChecked)
+                                    })
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(cuisine)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Group Preferences", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (userGroups.isEmpty()) {
+                        Text("No groups found.", color = Color.Gray)
+                    } else {
+                        userGroups.forEach { group ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onGroupSelected(
+                                            group.id, !selectedGroupIds.contains(group.id)
+                                        )
+                                    }
+                                    .padding(vertical = 4.dp)) {
+                                Checkbox(
+                                    checked = selectedGroupIds.contains(group.id),
+                                    onCheckedChange = { isChecked ->
+                                        onGroupSelected(group.id, isChecked)
+                                    })
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(group.name)
+                            }
+                        }
+                    }
+
+                    // TODO: Add other filter options here (e.g., price, dietary restrictions)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = onApplyClick,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple)
+                    ) { Text("Apply Filters", color = Color.White) }
+                }
+            }
+        }
     }
 }
 

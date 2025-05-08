@@ -9,6 +9,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.where.controller.GroupController
 import com.example.where.controller.RestaurantController
+import com.example.where.controller.UserController
+import com.example.where.controller.UserPreferencesController
 import com.example.where.model.Group
 import com.example.where.model.PlaceDetailResult
 import com.example.where.model.Restaurant
@@ -16,6 +18,7 @@ import com.example.where.model.UserPreferences
 import com.google.android.gms.maps.model.LatLng
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlin.random.Random
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -36,10 +39,12 @@ class HomeViewModel
 constructor(
         private val restaurantController: RestaurantController,
         private val groupController: GroupController,
+        private val userPreferencesController: UserPreferencesController,
+        private val userController: UserController,
         dataStore: DataStore<Preferences>
 ) : ViewModel() {
 
-    // User Preferences
+    // User Preferences for the CURRENT user (from DataStore)
     val currentUserPreferences: StateFlow<UserPreferences> =
             dataStore
                     .data
@@ -60,7 +65,8 @@ constructor(
                     .stateIn(
                             scope = viewModelScope,
                             started = SharingStarted.WhileSubscribed(5000),
-                            initialValue = UserPreferences() // Provide a default initial value
+                            initialValue =
+                                    UserPreferences() // Uses imported UserPreferences default
                     )
 
     companion object {
@@ -114,6 +120,19 @@ constructor(
     private val _selectedRestaurantForDetail = MutableStateFlow<Restaurant?>(null)
     val selectedRestaurantForDetail: StateFlow<Restaurant?> =
             _selectedRestaurantForDetail.asStateFlow()
+
+    // State for Filter Modal
+    private val _showFilterModal = MutableStateFlow(false)
+    val showFilterModal: StateFlow<Boolean> = _showFilterModal.asStateFlow()
+
+    private val _selectedCuisineFilters = MutableStateFlow(emptySet<String>())
+    val selectedCuisineFilters: StateFlow<Set<String>> = _selectedCuisineFilters.asStateFlow()
+
+    private var hasOpenedFilterModal = false // Flag to track first opening
+
+    // State for Group Filters
+    private val _selectedGroupFilters = MutableStateFlow(emptySet<String>())
+    val selectedGroupFilters: StateFlow<Set<String>> = _selectedGroupFilters.asStateFlow()
 
     // States for fetched restaurant details from Controller
     val restaurantDetails: StateFlow<PlaceDetailResult?> =
@@ -489,5 +508,227 @@ constructor(
                     userPreferences = prefs
             )
         }
+    }
+
+    // Event Handlers for Filter Modal
+    fun onFilterButtonClicked() {
+        viewModelScope.launch { groupController.fetchUserGroups() }
+        if (!hasOpenedFilterModal) {
+            // First time opening: Initialize with all user preferences
+            val currentPrefs = currentUserPreferences.value.cuisinePreferences
+            _selectedCuisineFilters.value = currentPrefs.toSet()
+            _selectedGroupFilters.value = emptySet() // Initialize group filters as empty
+        }
+        // For subsequent openings, _selectedCuisineFilters retains its last state
+        _showFilterModal.value = true
+    }
+
+    fun onDismissFilterModal() {
+        _showFilterModal.value = false
+    }
+
+    fun onCuisineFilterChanged(cuisine: String, isChecked: Boolean) {
+        if (isChecked && _selectedGroupFilters.value.isNotEmpty()) {
+            // If a cuisine is being checked AND a group filter is active, clear group filters
+            _selectedGroupFilters.value = emptySet()
+        }
+        _selectedCuisineFilters.update { currentFilters ->
+            if (isChecked) {
+                currentFilters + cuisine
+            } else {
+                currentFilters - cuisine
+            }
+        }
+    }
+
+    fun onGroupFilterChanged(groupId: String, isChecked: Boolean) {
+        if (isChecked) {
+            // A group is being checked
+            _selectedGroupFilters.value = setOf(groupId) // Set this group as the only selected one
+            _selectedCuisineFilters.value = emptySet() // Clear all cuisine filters
+        } else {
+            // A group is being unchecked
+            _selectedGroupFilters.value = emptySet() // No group is selected
+        }
+    }
+
+    fun applyFilters() {
+        viewModelScope.launch {
+            // Determine if a group filter is active
+            val selectedGroupId = _selectedGroupFilters.value.firstOrNull()
+
+            var preferencesToApply: UserPreferences = currentUserPreferences.value
+
+            if (selectedGroupId != null) {
+                val group = userGroups.value.find { it.id == selectedGroupId }
+                if (group != null) {
+                    val memberEmails = group.members
+                    Log.d(TAG, "Fetching preferences for group members (emails): $memberEmails")
+
+                    val memberPreferencesList = mutableListOf<UserPreferences>()
+                    if (memberEmails.isEmpty()) {
+                        Log.d(TAG, "Group $selectedGroupId has no members listed.")
+                    } else {
+                        memberEmails.forEach { email ->
+                            val uid = userController.getUidForEmail(email) // Get UID for email
+                            if (uid != null) {
+                                val prefsResult = userPreferencesController.getUserPreferences(uid)
+                                if (prefsResult.isSuccess) {
+                                    prefsResult.getOrNull()?.let {
+                                        Log.d(
+                                                TAG,
+                                                "Successfully fetched preferences for member (UID $uid, Email $email): $it"
+                                        )
+                                        memberPreferencesList.add(it)
+                                    }
+                                } else {
+                                    Log.e(
+                                            TAG,
+                                            "Failed to fetch preferences for member (UID $uid, Email $email): ${prefsResult.exceptionOrNull()?.message}"
+                                    )
+                                }
+                            } else {
+                                Log.w(
+                                        TAG,
+                                        "Could not find UID for email: $email. Skipping preferences for this member."
+                                )
+                            }
+                        }
+                    }
+
+                    if (memberPreferencesList.isNotEmpty()) {
+                        Log.d(
+                                TAG,
+                                "Aggregating preferences for ${memberPreferencesList.size} members."
+                        )
+                        preferencesToApply = aggregateGroupPreferences(memberPreferencesList)
+                        Log.d(TAG, "Aggregated group preferences: $preferencesToApply")
+                    } else {
+                        Log.d(
+                                TAG,
+                                "No member preferences available for group $selectedGroupId, using default group search parameters."
+                        )
+                        preferencesToApply =
+                                UserPreferences(
+                                        cuisinePreferences = emptyList(),
+                                        dietaryRestrictions = emptyList(),
+                                        priceRange = 1
+                                )
+                    }
+                } else {
+                    Log.w(TAG, "Selected group with ID $selectedGroupId not found in userGroups.")
+                    preferencesToApply =
+                            currentUserPreferences.value.copy(
+                                    cuisinePreferences = _selectedCuisineFilters.value.toList()
+                            )
+                }
+            } else {
+                Log.d(
+                        TAG,
+                        "No group filter active. Applying individual cuisine filters: ${_selectedCuisineFilters.value}"
+                )
+                preferencesToApply =
+                        currentUserPreferences.value.copy(
+                                cuisinePreferences = _selectedCuisineFilters.value.toList()
+                        )
+            }
+
+            Log.d(TAG, "Applying filters. Final effective preferences: $preferencesToApply")
+
+            if (_userLocation.value == null) {
+                Log.d(
+                        TAG,
+                        "User location not available, attempting to get it first for filter application."
+                )
+                restaurantController.getUserLocation(
+                        onSuccess = { latLng ->
+                            Log.d(
+                                    TAG,
+                                    "Location obtained: $latLng. Now fetching restaurants with effective prefs: $preferencesToApply"
+                            )
+                            viewModelScope.launch {
+                                restaurantController.fetchNearbyRestaurants(
+                                        userPreferences = preferencesToApply,
+                                        searchQuery = null
+                                )
+                            }
+                        },
+                        onError = { error ->
+                            Log.e(TAG, "Failed to get location for filter application: $error")
+                            _restaurantErrorMessage.value = "Failed to get location: $error"
+                        }
+                )
+            } else {
+                Log.d(
+                        TAG,
+                        "User location available. Fetching restaurants with effective prefs: $preferencesToApply"
+                )
+                restaurantController.fetchNearbyRestaurants(
+                        userPreferences = preferencesToApply,
+                        searchQuery = null
+                )
+            }
+
+            hasOpenedFilterModal = true
+            _showFilterModal.value = false
+        }
+    }
+
+    private fun aggregateGroupPreferences(
+            memberPreferencesList: List<UserPreferences>
+    ): UserPreferences {
+        if (memberPreferencesList.isEmpty()) {
+            return UserPreferences(
+                    priceRange = 1, // Default to lowest price
+                    dietaryRestrictions = emptyList(),
+                    cuisinePreferences = emptyList()
+            )
+        }
+
+        // Aggregate Price Level (lowest preference)
+        val minPriceRange = memberPreferencesList.minOfOrNull { it.priceRange } ?: 1
+
+        // Aggregate Dietary Restrictions (all unique)
+        val aggregatedDietaryRestrictions =
+                memberPreferencesList.flatMap { it.dietaryRestrictions }.distinct()
+
+        // Aggregate Cuisine Preferences (top 2 by count, random tie-breaking)
+        val cuisineCounts = mutableMapOf<String, Int>()
+        memberPreferencesList.forEach { userPrefs ->
+            userPrefs.cuisinePreferences.forEach {
+                cuisineCounts[it] = (cuisineCounts[it] ?: 0) + 1
+            }
+        }
+
+        val finalSelectedCuisines = mutableListOf<String>()
+        if (cuisineCounts.isNotEmpty()) {
+            val sortedCuisineEntries = cuisineCounts.entries.sortedByDescending { it.value }
+            val maxCount = sortedCuisineEntries.first().value
+            val cuisinesWithMaxCount =
+                    sortedCuisineEntries.filter { it.value == maxCount }.map { it.key }
+
+            if (cuisinesWithMaxCount.size >= 2) {
+                finalSelectedCuisines.addAll(cuisinesWithMaxCount.shuffled(Random).take(2))
+            } else { // cuisinesWithMaxCount.size == 1
+                finalSelectedCuisines.add(cuisinesWithMaxCount.first())
+                val remainingCuisineEntries = sortedCuisineEntries.filter { it.value < maxCount }
+                if (remainingCuisineEntries.isNotEmpty()) {
+                    val secondMaxCount = remainingCuisineEntries.first().value
+                    val cuisinesWithSecondMaxCount =
+                            remainingCuisineEntries.filter { it.value == secondMaxCount }.map {
+                                it.key
+                            }
+                    finalSelectedCuisines.addAll(
+                            cuisinesWithSecondMaxCount.shuffled(Random).take(1)
+                    )
+                }
+            }
+        }
+
+        return UserPreferences(
+                dietaryRestrictions = aggregatedDietaryRestrictions,
+                cuisinePreferences = finalSelectedCuisines,
+                priceRange = minPriceRange
+        )
     }
 }

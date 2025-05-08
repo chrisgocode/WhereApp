@@ -24,13 +24,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.security.AccessController.checkPermission
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Named
+import javax.inject.Singleton
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.roundToInt
 
+@Singleton
 class RestaurantController
 @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -164,7 +167,6 @@ class RestaurantController
                 )
                 return@suspendCancellableCoroutine
             }
-
             fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
                     if (location != null) {
                         val latLng = LatLng(location.latitude, location.longitude)
