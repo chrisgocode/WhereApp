@@ -31,8 +31,6 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -181,51 +179,24 @@ fun HomeScreen(
                     Column(modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp)) {
-                        // Top bar with title and notification icon
+                        // Top bar with title and location icon
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            horizontalArrangement = Arrangement.Start,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.LocationOn,
-                                    contentDescription = "Location",
-                                    tint = PrimaryPurple,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Text(
-                                    text = "Where?",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 20.sp,
-                                    color = DarkGray
-                                )
-                            }
-
-                            Row {
-                                Icon(
-                                    imageVector = Icons.Default.Notifications,
-                                    contentDescription = "Notifications",
-                                    tint = Color.Gray,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.Gray)
-                                        .clickable {
-                                            navController.navigate("profile")
-                                        }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = "Profile",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                            }
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "Location",
+                                tint = PrimaryPurple,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = "Where?",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp,
+                                color = DarkGray
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -445,8 +416,8 @@ fun HomeScreen(
                                                                 )
                                                                 viewModel.fetchMoreRestaurantsFromApi()
                                                             }, colors = ButtonDefaults.buttonColors(
-                                                                    containerColor = PrimaryPurple
-                                                                ), modifier = Modifier.fillMaxWidth(
+                                                                containerColor = PrimaryPurple
+                                                            ), modifier = Modifier.fillMaxWidth(
                                                                 0.7f
                                                             )
                                                         ) {
@@ -1181,12 +1152,3 @@ fun FilterModal(
         }
     }
 }
-
-// @Preview(showBackground = true)
-// @Composable
-// fun HomeScreenPreview() {
-//    val navController = rememberNavController() // Example NavController
-//    Scaffold(bottomBar = { BottomNavBar() }) { paddingValues ->
-//        Box(modifier = Modifier.padding(paddingValues)) { HomeScreen(NavController()) }
-//    }
-// }
