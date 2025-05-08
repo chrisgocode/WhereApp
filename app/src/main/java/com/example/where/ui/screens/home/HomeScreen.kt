@@ -71,7 +71,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -144,9 +146,7 @@ fun HomeScreen(
         viewModel.snackbarMessage.collectLatest { message ->
             if (message != null) {
                 Log.d(TAG, "Showing snackbar: $message")
-                snackbarHostState.showSnackbar(
-                    message = message, duration = SnackbarDuration.Short
-                )
+                snackbarHostState.showSnackbar(message = message, duration = SnackbarDuration.Short)
                 viewModel.clearSnackbarMessage()
             }
         }
@@ -162,339 +162,262 @@ fun HomeScreen(
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(hostState = snackbarHostState) }, bottomBar = {
-        BottomNavBar(selectedRoute = "home", onNavItemClick = onNavItemClick)
-    }, content = { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding), color = BackgroundWhite
-            ) {
-                Column(
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        bottomBar = { BottomNavBar(selectedRoute = "home", onNavItemClick = onNavItemClick) },
+        content = { innerPadding ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                Surface(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp)
+                        .padding(innerPadding), color = BackgroundWhite
                 ) {
-                    // Top bar with title and notification icon
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Column(modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)) {
+                        // Top bar with title and notification icon
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = "Location",
-                                tint = PrimaryPurple,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Text(
-                                text = "Where?",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp,
-                                color = DarkGray
-                            )
-                        }
-
-                        Row {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = "Notifications",
-                                tint = Color.Gray,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(
-                                modifier = Modifier.width(
-                                    16.dp
-                                )
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(
-                                        CircleShape
-                                    )
-                                    .background(
-                                        Color.Gray
-                                    )
-                                    .clickable {
-                                        navController.navigate(
-                                            "profile"
-                                        )
-                                    }) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = "Profile",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(
-                                        24.dp
-                                    )
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = "Location",
+                                    tint = PrimaryPurple,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = "Where?",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp,
+                                    color = DarkGray
                                 )
                             }
+
+                            Row {
+                                Icon(
+                                    imageVector = Icons.Default.Notifications,
+                                    contentDescription = "Notifications",
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.Gray)
+                                        .clickable {
+                                            navController.navigate("profile")
+                                        }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = "Profile",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                    // Search box
-                    OutlinedTextField(
-                        value = searchQuery, onValueChange = {
-                        viewModel.updateSearchQuery(it)
-                    }, modifier = Modifier.fillMaxWidth(), placeholder = {
-                        Text("Search restaurants...")
-                    }, leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Search, contentDescription = "Search"
+                        // Search box
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.updateSearchQuery(it) },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Search restaurants...") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search"
+                                )
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedIndicatorColor = LightGray,
+                                unfocusedIndicatorColor = LightGray,
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White
+                            ),
+                            singleLine = true
                         )
-                    }, shape = RoundedCornerShape(8.dp), colors = TextFieldDefaults.colors(
-                        focusedIndicatorColor = LightGray,
-                        unfocusedIndicatorColor = LightGray,
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White
-                    ), singleLine = true
-                    )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                    // Tabs
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                        // Tabs
                         Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(
-                                    end = 8.dp
-                                ),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "List",
-                                color = if (selectedTabIndex == 1) Color.Gray
-                                else PrimaryPurple,
-                                fontWeight = if (selectedTabIndex == 1) FontWeight.Normal
-                                else FontWeight.Bold,
-                                modifier = Modifier.clickable {
-                                    viewModel.selectTab(
-                                        0
-                                    )
-                                })
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 8.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "List",
+                                    color = if (selectedTabIndex == 1) Color.Gray
+                                    else PrimaryPurple,
+                                    fontWeight = if (selectedTabIndex == 1) FontWeight.Normal
+                                    else FontWeight.Bold,
+                                    modifier = Modifier.clickable { viewModel.selectTab(0) })
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 8.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = if (selectedTabIndex == 0) Color.Gray
+                                    else PrimaryPurple,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Map",
+                                    color = if (selectedTabIndex == 0) Color.Gray
+                                    else PrimaryPurple,
+                                    fontWeight = if (selectedTabIndex == 0) FontWeight.Normal
+                                    else FontWeight.Bold,
+                                    modifier = Modifier.clickable { viewModel.selectTab(1) })
+                            }
                         }
 
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(
-                                    start = 8.dp
-                                ),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = if (selectedTabIndex == 0) Color.Gray
-                                else PrimaryPurple,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(
-                                modifier = Modifier.width(4.dp)
-                            )
-                            Text(
-                                text = "Map",
-                                color = if (selectedTabIndex == 0) Color.Gray
-                                else PrimaryPurple,
-                                fontWeight = if (selectedTabIndex == 0) FontWeight.Normal
-                                else FontWeight.Bold,
-                                modifier = Modifier.clickable {
-                                    viewModel.selectTab(
-                                        1
-                                    )
-                                })
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
+                        Box(modifier = Modifier
                             .fillMaxWidth()
-                            .height(2.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(0.5f)
-                                .height(2.dp)
-                                .align(
-                                    if (selectedTabIndex == 0) Alignment.CenterStart
-                                    else Alignment.CenterEnd
-                                )
-                                .background(
-                                    PrimaryPurple
-                                )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Content based on selected tab
-                    if (!hasLocationPermission) {
-                        // Request location permission
-                        LocationPermissionUtils.RequestLocationPermission(onPermissionGranted = {
-                            viewModel.updateLocationPermission(
-                                true
-                            )
-                        }, onPermissionDenied = { /* TODO: Permission Denied */
-                        })
-
-                        // Show permission request message
-                        Box(
-                            modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "Location permission required to show restaurants"
-                            )
-                        }
-                    } else if (restaurantIsLoading && nearbyRestaurantsFromVM.isEmpty()) {
-                        // Loading indicator
-                        Box(
-                            modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(
-                                color = PrimaryPurple
-                            )
-                        }
-                    } else if (restaurantErrorMessage != null) {
-                        // Error message
-                        Box(
-                            modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = restaurantErrorMessage ?: "Unknown error", color = Color.Red
-                            )
-                        }
-                    } else {
-                        // Show content based on tab selection
-                        when (selectedTabIndex) {
-                            0 -> {
-                                // List View
-                                val reachedEnd = remember {
-                                    derivedStateOf {
-                                        val lastVisibleItem =
-                                            gridState.layoutInfo.visibleItemsInfo.lastOrNull()
-                                        lastVisibleItem?.index != null && lastVisibleItem.index >= paginatedRestaurants.size - 2 && paginatedRestaurants.size < nearbyRestaurantsFromVM.size
-                                    }
-                                }
-
-                                // When end reached, request
-                                // more local restaurants
-                                // from ViewModel
-                                LaunchedEffect(
-                                    reachedEnd.value
-                                ) {
-                                    if (reachedEnd.value) {
-                                        Log.d(
-                                            TAG,
-                                            "Reached end of local list, requesting more local restaurants from ViewModel"
-                                        )
-                                        viewModel.requestMoreLocalRestaurants()
-                                    }
-                                }
-
-                                LazyVerticalGrid(
-                                    state = gridState, columns = GridCells.Fixed(
-                                        2
-                                    ), horizontalArrangement = Arrangement.spacedBy(
-                                        16.dp
-                                    ), verticalArrangement = Arrangement.spacedBy(
-                                        16.dp
+                            .height(2.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.5f)
+                                    .height(2.dp)
+                                    .align(
+                                        if (selectedTabIndex == 0) Alignment.CenterStart
+                                        else Alignment.CenterEnd
                                     )
-                                ) {
-                                    items(
-                                        paginatedRestaurants, key = {
-                                            it.id
-                                        }) { restaurant ->
-                                        RestaurantCard(
-                                            restaurant = restaurant,
-                                            isChecked = restaurant.id in checkedRestaurantIds,
-                                            onCheckedChange = { isChecked ->
-                                                viewModel.onRestaurantCheckedChange(
-                                                    restaurant.id, isChecked
-                                                )
-                                            },
-                                            onClick = {
-                                                viewModel.onRestaurantCardClick(
-                                                    restaurant
-                                                )
-                                            },
-                                            apiKey = apiKey
-                                        )
+                                    .background(PrimaryPurple)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Content based on selected tab
+                        if (!hasLocationPermission) {
+                            // Request location permission
+                            LocationPermissionUtils.RequestLocationPermission(onPermissionGranted = {
+                                viewModel.updateLocationPermission(true)
+                            }, onPermissionDenied = { /* TODO: Permission Denied */ })
+
+                            // Show permission request message
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) { Text("Location permission required to show restaurants") }
+                        } else if (restaurantIsLoading && nearbyRestaurantsFromVM.isEmpty()) {
+                            // Loading indicator
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) { CircularProgressIndicator(color = PrimaryPurple) }
+                        } else if (restaurantErrorMessage != null) {
+                            // Error message
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = restaurantErrorMessage ?: "Unknown error",
+                                    color = Color.Red
+                                )
+                            }
+                        } else {
+                            // Show content based on tab selection
+                            when (selectedTabIndex) {
+                                0 -> {
+                                    // List View
+                                    val reachedEnd = remember {
+                                        derivedStateOf {
+                                            val lastVisibleItem =
+                                                gridState.layoutInfo.visibleItemsInfo.lastOrNull()
+                                            lastVisibleItem?.index != null && lastVisibleItem.index >= paginatedRestaurants.size - 2 && paginatedRestaurants.size < nearbyRestaurantsFromVM.size
+                                        }
                                     }
 
-                                    // Show loading
-                                    // indicator at the
-                                    // bottom when more
-                                    // items
-                                    // are
-                                    // available
-                                    if (paginatedRestaurants.size < nearbyRestaurantsFromVM.size || restaurantHasMoreResults) {
-                                        item(
-                                            span = {
-                                                GridItemSpan(
-                                                    maxLineSpan
-                                                )
-                                            }) {
-                                            if (restaurantIsLoadingMore) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(
-                                                            16.dp
-                                                        ), contentAlignment = Alignment.Center
-                                                ) {
-                                                    CircularProgressIndicator(
-                                                        modifier = Modifier.size(
-                                                            24.dp
-                                                        ), color = PrimaryPurple, strokeWidth = 2.dp
+                                    // When end reached, request
+                                    // more local restaurants
+                                    // from ViewModel
+                                    LaunchedEffect(reachedEnd.value) {
+                                        if (reachedEnd.value) {
+                                            Log.d(
+                                                TAG,
+                                                "Reached end of local list, requesting more local restaurants from ViewModel"
+                                            )
+                                            viewModel.requestMoreLocalRestaurants()
+                                        }
+                                    }
+
+                                    LazyVerticalGrid(
+                                        state = gridState,
+                                        columns = GridCells.Fixed(2),
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        items(paginatedRestaurants, key = { it.id }) { restaurant ->
+                                            RestaurantCard(
+                                                restaurant = restaurant,
+                                                isChecked = restaurant.id in checkedRestaurantIds,
+                                                onCheckedChange = { isChecked ->
+                                                    viewModel.onRestaurantCheckedChange(
+                                                        restaurant.id, isChecked
                                                     )
-                                                }
-                                            } else if (restaurantHasMoreResults) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(
-                                                            16.dp
-                                                        ), contentAlignment = Alignment.Center
-                                                ) {
-                                                    if (restaurantIsLoadingMore) {
-                                                        Log.d(
-                                                            TAG,
-                                                            "isLoadingMore is true, showing loading indicator"
+                                                },
+                                                onClick = {
+                                                    viewModel.onRestaurantCardClick(
+                                                        restaurant
+                                                    )
+                                                },
+                                                apiKey = apiKey
+                                            )
+                                        }
+
+                                        // Show loading
+                                        // indicator at the
+                                        // bottom when more
+                                        // items
+                                        // are
+                                        // available
+                                        if (paginatedRestaurants.size < nearbyRestaurantsFromVM.size || restaurantHasMoreResults) {
+                                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                                if (restaurantIsLoadingMore) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(16.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(24.dp),
+                                                            color = PrimaryPurple,
+                                                            strokeWidth = 2.dp
                                                         )
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .fillMaxWidth(
-                                                                    0.7f
-                                                                )
-                                                                .height(
-                                                                    48.dp
-                                                                ), // Match
-                                                            // button
-                                                            // height
-                                                            contentAlignment = Alignment.Center
-                                                        ) {
-                                                            CircularProgressIndicator(
-                                                                modifier = Modifier.size(
-                                                                    28.dp
-                                                                ),
-                                                                color = PrimaryPurple,
-                                                                strokeWidth = 3.dp
-                                                            )
-                                                        }
-                                                    } else {
+                                                    }
+                                                } else if (restaurantHasMoreResults) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(16.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
                                                         Log.d(
                                                             TAG,
                                                             "isLoadingMore is false, showing button. hasMoreResults=$restaurantHasMoreResults"
@@ -507,8 +430,8 @@ fun HomeScreen(
                                                                 )
                                                                 viewModel.fetchMoreRestaurantsFromApi()
                                                             }, colors = ButtonDefaults.buttonColors(
-                                                                containerColor = PrimaryPurple
-                                                            ), modifier = Modifier.fillMaxWidth(
+                                                                    containerColor = PrimaryPurple
+                                                                ), modifier = Modifier.fillMaxWidth(
                                                                 0.7f
                                                             )
                                                         ) {
@@ -522,89 +445,69 @@ fun HomeScreen(
                                         }
                                     }
                                 }
-                            }
 
-                            1 -> {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(
-                                            RoundedCornerShape(
-                                                12.dp
-                                            )
-                                        )
-                                ) {
-                                    RestaurantMapView(
-                                        userLocation = userLocation,
-                                        restaurants = nearbyRestaurantsFromVM,
-                                        onRestaurantClick = { restaurant ->
-                                            viewModel.onRestaurantCardClick(
-                                                restaurant
-                                            )
-                                        },
-                                        onClearClicked = {
-                                            viewModel.clearMapAndRestaurantList()
-                                        },
-                                        onSearchHereClicked = { center, radius ->
-                                            viewModel.searchMapArea(
-                                                center, radius
-                                            )
-                                        })
+                                1 -> {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(RoundedCornerShape(12.dp))
+                                    ) {
+                                        RestaurantMapView(
+                                            userLocation = userLocation,
+                                            restaurants = nearbyRestaurantsFromVM,
+                                            onRestaurantClick = { restaurant ->
+                                                viewModel.onRestaurantCardClick(restaurant)
+                                            },
+                                            onClearClicked = {
+                                                viewModel.clearMapAndRestaurantList()
+                                            },
+                                            onSearchHereClicked = { center, radius ->
+                                                viewModel.searchMapArea(center, radius)
+                                            })
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            if (checkedRestaurantIds.isNotEmpty()) {
-                Button(
-                    onClick = {
-                        viewModel.onSendButtonInHomeScreenClicked()
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 80.dp)
-                        .fillMaxWidth(0.7f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = PrimaryPurple
-                    )
-                ) {
-                    Text(
-                        "Send (${checkedRestaurantIds.size})", color = Color.White
-                    )
+                if (checkedRestaurantIds.isNotEmpty()) {
+                    Button(
+                        onClick = { viewModel.onSendButtonInHomeScreenClicked() },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 80.dp)
+                            .fillMaxWidth(0.7f),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple)
+                    ) { Text("Send (${checkedRestaurantIds.size})", color = Color.White) }
                 }
             }
-        }
 
-        // Conditionally display the Send Modal
-        if (showSendModal) {
-            SendModal(
-                groups = userGroupsForModal,
-                isLoading = groupsLoadingInModal,
-                errorMessage = groupsErrorMessageInModal,
-                isSending = isSendingToGroupInModal,
-                selectedRestaurantIds = checkedRestaurantIds,
-                selectedGroup = selectedGroupForModal,
-                onDismiss = { viewModel.onDismissSendModal() },
-                onGroupSelected = { group ->
-                    viewModel.onGroupSelectedInModal(group)
-                },
-                onSend = { viewModel.onSendToGroupConfirmedInModal() })
-        }
+            // Conditionally display the Send Modal
+            if (showSendModal) {
+                SendModal(
+                    groups = userGroupsForModal,
+                    isLoading = groupsLoadingInModal,
+                    errorMessage = groupsErrorMessageInModal,
+                    isSending = isSendingToGroupInModal,
+                    selectedGroup = selectedGroupForModal,
+                    onDismiss = { viewModel.onDismissSendModal() },
+                    onGroupSelected = { group -> viewModel.onGroupSelectedInModal(group) },
+                    onSend = { viewModel.onSendToGroupConfirmedInModal() })
+            }
 
-        // Conditionally display the Restaurant Detail Modal
-        if (showRestaurantDetailModal && selectedRestaurantSummary != null) {
-            RestaurantDetailModal(
-                restaurantSummary = selectedRestaurantSummary!!,
-                restaurantDetails = restaurantDetailsData,
-                isLoading = detailsAreLoading,
-                errorMessage = detailsErrorMessageText,
-                onDismiss = { viewModel.onDismissRestaurantDetailModal() },
-                apiKey = apiKey
-            )
-        }
-    })
+            // Conditionally display the Restaurant Detail Modal
+            if (showRestaurantDetailModal && selectedRestaurantSummary != null) {
+                RestaurantDetailModal(
+                    restaurantSummary = selectedRestaurantSummary!!,
+                    restaurantDetails = restaurantDetailsData,
+                    isLoading = detailsAreLoading,
+                    errorMessage = detailsErrorMessageText,
+                    onDismiss = { viewModel.onDismissRestaurantDetailModal() },
+                    apiKey = apiKey
+                )
+            }
+        })
 }
 
 @OptIn(
@@ -616,7 +519,6 @@ fun SendModal(
     isLoading: Boolean,
     errorMessage: String?,
     isSending: Boolean,
-    selectedRestaurantIds: Set<String>,
     selectedGroup: Group?,
     onDismiss: () -> Unit,
     onGroupSelected: (Group) -> Unit,
@@ -640,13 +542,9 @@ fun SendModal(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "Send to ...", fontWeight = FontWeight.Bold, fontSize = 20.sp
-                        )
+                        Text("Send to ...", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                         IconButton(onClick = onDismiss) {
-                            Icon(
-                                Icons.Default.Close, contentDescription = "Close"
-                            )
+                            Icon(Icons.Default.Close, contentDescription = "Close")
                         }
                     }
 
@@ -655,15 +553,13 @@ fun SendModal(
                     // Loading or Error indicator for groups
                     if (isLoading) {
                         CircularProgressIndicator(
-                            modifier = Modifier.align(
-                                Alignment.CenterHorizontally
-                            )
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
                         )
                     } else if (errorMessage != null) {
                         Text(
-                            errorMessage, color = Color.Red, modifier = Modifier.align(
-                                Alignment.CenterHorizontally
-                            )
+                            errorMessage,
+                            color = Color.Red,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
                         )
                     } else {
                         // Dropdown Menu
@@ -686,17 +582,11 @@ fun SendModal(
                             )
                             ExposedDropdownMenu(
                                 expanded = expanded,
-                                onDismissRequest = {
-                                    expanded = false
-                                },
+                                onDismissRequest = { expanded = false },
                             ) {
                                 if (groups.isEmpty()) {
                                     DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                "No groups found"
-                                            )
-                                        },
+                                        text = { Text("No groups found") },
                                         enabled = false,
                                         onClick = {},
                                         contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
@@ -704,15 +594,9 @@ fun SendModal(
                                 } else {
                                     groups.forEach { group ->
                                         DropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    group.name
-                                                )
-                                            },
+                                            text = { Text(group.name) },
                                             onClick = {
-                                                onGroupSelected(
-                                                    group
-                                                )
+                                                onGroupSelected(group)
                                                 expanded = false
                                             },
                                             contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
@@ -732,9 +616,7 @@ fun SendModal(
                         modifier = Modifier
                             .align(Alignment.CenterHorizontally)
                             .fillMaxWidth(0.6f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = PrimaryPurple
-                        )
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple)
                     ) {
                         if (isSending) {
                             CircularProgressIndicator(
@@ -790,16 +672,12 @@ fun RestaurantCard(
                 // Display attributions
                 firstPhotoMeta.attributions?.firstOrNull()?.let { attributionText ->
                     Text(
-                        text = attributionText, // TODO: HTML Parsing
+                        text = AnnotatedString.fromHtml(attributionText),
                         fontSize = 8.sp,
                         color = Color.White.copy(alpha = 0.7f),
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .background(
-                                Color.Black.copy(
-                                    alpha = 0.5f
-                                )
-                            )
+                            .background(Color.Black.copy(alpha = 0.5f))
                             .padding(2.dp)
                     )
                 }
@@ -841,11 +719,7 @@ fun RestaurantCard(
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color.White)
                     .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = restaurant.category, fontSize = 12.sp, color = Color.Black
-                )
-            }
+            ) { Text(text = restaurant.category, fontSize = 12.sp, color = Color.Black) }
 
             // TODO:
             //  Route to necessary screen
@@ -874,16 +748,12 @@ fun RestaurantCard(
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            painter = painterResource(
-                                id = R.drawable.ic_star
-                            ),
+                            painter = painterResource(id = R.drawable.ic_star),
                             contentDescription = "Rating",
                             tint = Color(0xFFFFC107),
                             modifier = Modifier.size(16.dp)
                         )
-                        Text(
-                            text = restaurant.rating.toString(), fontSize = 14.sp
-                        )
+                        Text(text = restaurant.rating.toString(), fontSize = 14.sp)
                     }
                 }
 
@@ -904,9 +774,7 @@ fun RestaurantCard(
                     )
                 }
 
-                Text(
-                    text = restaurant.distance, fontSize = 12.sp, color = Color.Gray
-                )
+                Text(text = restaurant.distance, fontSize = 12.sp, color = Color.Gray)
             }
         }
     }
@@ -954,9 +822,7 @@ fun RestaurantDetailModal(
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(
-                            Icons.Default.Close, contentDescription = "Close", tint = DarkGray
-                        )
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = DarkGray)
                     }
                 }
 
@@ -965,18 +831,14 @@ fun RestaurantDetailModal(
                 val photoAttributions = photoToDisplay?.htmlAttributions
                 val photoReference = photoToDisplay?.photoReference
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .background(LightGray)
-                ) {
+                Box(modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .background(LightGray)) {
                     if (photoReference != null) {
                         val imageUrl =
                             "https://maps.googleapis.com/maps/api/place/photo".plus("?maxwidth=800")
-                                .plus(
-                                    "&photoreference=$photoReference"
-                                ).plus("&key=$apiKey")
+                                .plus("&photoreference=$photoReference").plus("&key=$apiKey")
                         AsyncImage(
                             model = imageUrl,
                             contentDescription = "${restaurantDetails.name ?: restaurantSummary.name} photo",
@@ -985,20 +847,13 @@ fun RestaurantDetailModal(
                         )
                         photoAttributions?.firstOrNull()?.let { attributionText ->
                             Text(
-                                text = attributionText, fontSize = 8.sp, color = Color.White.copy(
-                                    alpha = 0.8f
-                                ), modifier = Modifier
-                                    .align(
-                                        Alignment.BottomStart
-                                    )
-                                    .background(
-                                        Color.Black.copy(
-                                            alpha = 0.6f
-                                        )
-                                    )
-                                    .padding(
-                                        horizontal = 4.dp, vertical = 2.dp
-                                    )
+                                text = AnnotatedString.fromHtml(attributionText),
+                                fontSize = 8.sp,
+                                color = Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .background(Color.Black.copy(alpha = 0.6f))
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
                             )
                         }
                     } else {
@@ -1007,11 +862,7 @@ fun RestaurantDetailModal(
                                 .fillMaxSize()
                                 .background(Color.Gray),
                             contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "No photo available", color = Color.White, fontSize = 16.sp
-                            )
-                        }
+                        ) { Text("No photo available", color = Color.White, fontSize = 16.sp) }
                     }
                 }
 
@@ -1029,29 +880,17 @@ fun RestaurantDetailModal(
                             .fillMaxSize()
                             .padding(16.dp),
                         contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            errorMessage, color = Color.Red, fontSize = 16.sp
-                        )
-                    }
+                    ) { Text(errorMessage, color = Color.Red, fontSize = 16.sp) }
                 } else if (restaurantDetails != null) {
                     Column(
                         modifier = Modifier
-                            .padding(
-                                horizontal = 16.dp, vertical = 12.dp
-                            )
-                            .verticalScroll(
-                                rememberScrollState()
-                            )
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .verticalScroll(rememberScrollState())
                     ) {
                         // Rating and Reviews
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                painter = painterResource(
-                                    id = R.drawable.ic_star
-                                ),
+                                painter = painterResource(id = R.drawable.ic_star),
                                 contentDescription = "Rating",
                                 tint = Color(0xFFFFC107),
                                 modifier = Modifier.size(20.dp)
@@ -1074,50 +913,34 @@ fun RestaurantDetailModal(
 
                         // Address
                         restaurantDetails.formattedAddress?.let {
-                            DetailItem(
-                                icon = Icons.Default.LocationOn, text = it, type = "address"
-                            )
+                            DetailItem(icon = Icons.Default.LocationOn, text = it, type = "address")
                             Spacer(modifier = Modifier.height(8.dp))
                         }
 
                         // Phone Number
                         restaurantDetails.internationalPhoneNumber?.let {
-                            DetailItem(
-                                icon = Icons.Default.Call, text = it, type = "phone"
-                            )
+                            DetailItem(icon = Icons.Default.Call, text = it, type = "phone")
                             Spacer(modifier = Modifier.height(8.dp))
                         }
 
                         // Website
                         restaurantDetails.website?.let {
-                            DetailItem(
-                                icon = Icons.Default.Info, text = it, type = "website"
-                            )
+                            DetailItem(icon = Icons.Default.Info, text = it, type = "website")
                             Spacer(modifier = Modifier.height(8.dp))
                         }
 
                         // Price Level
                         restaurantDetails.priceLevel?.let {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    painter = painterResource(
-                                        id = R.drawable.ic_star
-                                    ),
+                                    painter = painterResource(id = R.drawable.ic_star),
                                     contentDescription = "Price Level",
                                     tint = PrimaryPurple,
                                     modifier = Modifier.size(20.dp)
                                 )
-                                Spacer(
-                                    modifier = Modifier.width(8.dp)
-                                )
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "$".repeat(
-                                        it.coerceAtLeast(
-                                            1
-                                        )
-                                    ),
+                                    text = "$".repeat(it.coerceAtLeast(1)),
                                     fontSize = 16.sp,
                                     color = DarkGray,
                                     fontWeight = FontWeight.Medium
@@ -1136,8 +959,7 @@ fun RestaurantDetailModal(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (hours.openNow == true) "Open now"
-                                else "Closed",
+                                text = if (hours.openNow == true) "Open now" else "Closed",
                                 fontSize = 16.sp,
                                 color = if (hours.openNow == true) Color(0xFF4CAF50)
                                 else Color.Red,
@@ -1145,9 +967,7 @@ fun RestaurantDetailModal(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             hours.weekdayText?.forEach { daySchedule ->
-                                Text(
-                                    text = daySchedule, fontSize = 14.sp, color = Color.Gray
-                                )
+                                Text(text = daySchedule, fontSize = 14.sp, color = Color.Gray)
                             }
                         }
 
@@ -1156,14 +976,8 @@ fun RestaurantDetailModal(
                         Button(
                             onClick = onDismiss,
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = PrimaryPurple
-                            )
-                        ) {
-                            Text(
-                                "Close", color = Color.White, fontSize = 16.sp
-                            )
-                        }
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryPurple)
+                        ) { Text("Close", color = Color.White, fontSize = 16.sp) }
                     }
                 } else {
                     // Fallback or initial state before details load and no
@@ -1173,11 +987,7 @@ fun RestaurantDetailModal(
                             .fillMaxSize()
                             .padding(16.dp),
                         contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "Loading details...", fontSize = 16.sp, color = DarkGray
-                        )
-                    }
+                    ) { Text("Loading details...", fontSize = 16.sp, color = DarkGray) }
                 }
             }
         }
@@ -1199,10 +1009,7 @@ fun DetailItem(
                     val gmmIntentUri = "geo:0,0?q=${Uri.encode(text)}".toUri()
                     val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
                     mapIntent.setPackage("com.google.android.apps.maps")
-                    if (mapIntent.resolveActivity(
-                            context.packageManager
-                        ) != null
-                    ) {
+                    if (mapIntent.resolveActivity(context.packageManager) != null) {
                         context.startActivity(mapIntent)
                     } else {
                         // Fallback if Google Maps is not installed
@@ -1216,10 +1023,7 @@ fun DetailItem(
                 "phone" -> {
                     val phoneUri = "tel:$text".toUri()
                     val dialIntent = Intent(Intent.ACTION_DIAL, phoneUri)
-                    if (dialIntent.resolveActivity(
-                            context.packageManager
-                        ) != null
-                    ) {
+                    if (dialIntent.resolveActivity(context.packageManager) != null) {
                         context.startActivity(dialIntent)
                     }
                 }
