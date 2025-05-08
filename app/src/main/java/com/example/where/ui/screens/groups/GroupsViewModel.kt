@@ -13,6 +13,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import com.example.where.model.Group
 import com.google.firebase.Timestamp
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
 data class UserSearchResult(
     val email: String,
@@ -28,7 +30,8 @@ data class GroupsUiState(
     val allUsers: List<UserSearchResult> = emptyList()
 )
 
-class GroupsViewModel(
+@HiltViewModel
+class GroupsViewModel @Inject constructor(
     private val dataStore: DataStore<Preferences>
 ) : ViewModel() {
 
