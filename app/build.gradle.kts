@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.secrets.gradle.plugin)
+    id("com.google.devtools.ksp")
+    id("com.google.dagger.hilt.android")
     id("com.google.gms.google-services")
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.20"
 }
@@ -62,6 +64,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.animation:animation")
+    implementation("io.coil-kt.coil3:coil-compose:3.1.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.1.0")
+    implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
+    implementation("com.google.firebase:firebase-analytics")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation(platform(libs.firebase.bom))
     implementation("com.google.firebase:firebase-analytics")
@@ -87,4 +93,8 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    implementation("com.google.dagger:hilt-android:2.56.1")
+    ksp("com.google.dagger:hilt-android-compiler:2.56.1")
+
 }
