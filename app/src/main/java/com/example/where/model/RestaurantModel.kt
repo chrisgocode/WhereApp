@@ -33,6 +33,8 @@ data class PhotoMetadataInternal(
         val html_attributions: List<String>
 )
 
+// TODO:
+//  Extract image to use for each restaurant?
 data class PlaceResult(
         val place_id: String,
         val name: String,

@@ -4,13 +4,14 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.secrets.gradle.plugin)
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
     id("com.google.gms.google-services")
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.20"
 }
 
+// Load properties from local.properties
 val localProperties = Properties().apply {
     val localPropertiesFile = rootProject.file("local.properties")
     if (localPropertiesFile.exists()) {
@@ -21,17 +22,22 @@ val localProperties = Properties().apply {
 android {
     namespace = "com.example.where"
     compileSdk = 35
+
     defaultConfig {
         applicationId = "com.example.where"
         minSdk = 29
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Set the Maps API key from local.properties
         val mapsApiKey = localProperties.getProperty("MAPS_API_KEY", "")
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
     }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -42,54 +48,55 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "11"
     }
     buildFeatures {
         compose = true
         buildConfig = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.17"
-    }
 }
 
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2024.09.03"))
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.animation:animation")
     implementation("io.coil-kt.coil3:coil-compose:3.1.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.1.0")
     implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
-    implementation(platform(libs.firebase.bom))
-    implementation("com.google.firebase:firebase-analytics")
-    implementation(libs.play.services.auth)
-    implementation("androidx.navigation:navigation-compose:2.8.3")
+    implementation(libs.play.services.auth) // Add this line
+    implementation("androidx.navigation:navigation-compose:2.7.6")
     implementation(libs.firebase.auth.ktx)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+    implementation(libs.firebase.auth.ktx)
     implementation(libs.androidx.credentials)
-    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Google dependencies
     implementation(libs.googleid)
     implementation(libs.google.maps)
     implementation(libs.google.maps.location)
     implementation(libs.google.maps.compose)
+
+    // Retrofit dependencies
     implementation(libs.retrofit)
     implementation(libs.retrofit2.gson)
+
+    implementation(libs.androidx.datastore.core.android)
+    implementation(libs.androidx.datastore.preferences.core.android)
     implementation(libs.firebase.firestore.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform("androidx.compose:compose-bom:2024.09.03"))
+    androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
