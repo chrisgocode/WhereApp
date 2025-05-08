@@ -31,8 +31,6 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -191,6 +189,7 @@ fun HomeScreen(
             }
 
     Scaffold(
+<<<<<<< HEAD
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             bottomBar = { BottomNavBar(selectedRoute = "home", onNavItemClick = onNavItemClick) },
             content = { innerPadding ->
@@ -333,6 +332,39 @@ fun HomeScreen(
                                     )
                                 }
                             }
+=======
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        bottomBar = { BottomNavBar(selectedRoute = "home", onNavItemClick = onNavItemClick) },
+        content = { innerPadding ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding), color = BackgroundWhite
+                ) {
+                    Column(modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)) {
+                        // Top bar with title and location icon
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "Location",
+                                tint = PrimaryPurple,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = "Where?",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp,
+                                color = DarkGray
+                            )
+                        }
+>>>>>>> c676f06743b2f7cedd88442beb4e8d424ffa0a48
 
                             Box(modifier = Modifier.fillMaxWidth().height(2.dp)) {
                                 Box(
@@ -344,6 +376,7 @@ fun HomeScreen(
                                                                         Alignment.CenterStart
                                                                 else Alignment.CenterEnd
                                                         )
+<<<<<<< HEAD
                                                         .background(PrimaryPurple)
                                 )
                             }
@@ -430,6 +463,31 @@ fun HomeScreen(
                                                             viewModel.onRestaurantCheckedChange(
                                                                     restaurant.id,
                                                                     isChecked
+=======
+                                                    }
+                                                } else if (restaurantHasMoreResults) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(16.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Log.d(
+                                                            TAG,
+                                                            "isLoadingMore is false, showing button. hasMoreResults=$restaurantHasMoreResults"
+                                                        )
+                                                        Button(
+                                                            onClick = {
+                                                                Log.d(
+                                                                    TAG,
+                                                                    "Load More button clicked - calling ViewModel"
+                                                                )
+                                                                viewModel.fetchMoreRestaurantsFromApi()
+                                                            }, colors = ButtonDefaults.buttonColors(
+                                                                containerColor = PrimaryPurple
+                                                            ), modifier = Modifier.fillMaxWidth(
+                                                                0.7f
+>>>>>>> c676f06743b2f7cedd88442beb4e8d424ffa0a48
                                                             )
                                                         },
                                                         onClick = {
@@ -1234,12 +1292,3 @@ fun FilterModal(
         }
     }
 }
-
-// @Preview(showBackground = true)
-// @Composable
-// fun HomeScreenPreview() {
-//    val navController = rememberNavController() // Example NavController
-//    Scaffold(bottomBar = { BottomNavBar() }) { paddingValues ->
-//        Box(modifier = Modifier.padding(paddingValues)) { HomeScreen(NavController()) }
-//    }
-// }
