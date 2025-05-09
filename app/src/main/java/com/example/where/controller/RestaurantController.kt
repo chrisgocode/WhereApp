@@ -396,10 +396,7 @@ constructor(
         apiKey = key
     }
 
-    private fun processResponse(
-            response: NearbySearchResponse,
-            location: LatLng
-    ) {
+    private fun processResponse(response: NearbySearchResponse, location: LatLng) {
         val status = response.status
         if (status == "OK") {
             Log.d(
@@ -562,6 +559,27 @@ constructor(
             _detailsErrorMessage.value = "Exception: ${e.message}"
         } finally {
             _detailsLoading.value = false
+        }
+    }
+
+    // Fetch details for a specific restaurant and return directly
+    suspend fun getPlaceDetailResult(placeId: String): PlaceDetailResult? {
+        return try {
+            val fieldsToFetch =
+                    "name,formatted_address,international_phone_number,website,opening_hours,rating,user_ratings_total,price_level,photo,geometry,place_id,vicinity,types"
+            val response =
+                    RestaurantApiClient.placesApiService.getRestaurantDetails(
+                            placeId = placeId,
+                            fields = fieldsToFetch,
+                            apiKey = apiKey
+                    )
+            if (response.status == "OK" && response.result != null) {
+                response.result
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 }
